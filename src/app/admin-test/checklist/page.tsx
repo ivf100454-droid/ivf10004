@@ -30,6 +30,8 @@ function PhotoUploader(props: { assignedItemId: string; onDone: () => void }) {
   const [uploading, setUploading] = useState(false);
   const [msg, setMsg] = useState("");
   const [viewUrl, setViewUrl] = useState("");
+  const [viewMimeType, setViewMimeType] = useState("");
+  const [viewFilename, setViewFilename] = useState("");
 
   async function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files && e.target.files[0];
@@ -59,19 +61,28 @@ function PhotoUploader(props: { assignedItemId: string; onDone: () => void }) {
     if (res.ok) {
       const data = await res.json();
       setViewUrl(data.url);
+      setViewMimeType(data.mimeType || "");
+      setViewFilename(data.filename || "");
     } else {
-      setMsg("아직 제출된 사진이 없습니다.");
+      setMsg("아직 제출된 파일이 없습니다.");
     }
   }
 
   return (
     <div style={{ marginBottom: 6 }}>
-      <input type="file" accept="image/*" capture="environment" onChange={handleFile} disabled={uploading} />
+      <input type="file" accept="image/*,application/pdf" onChange={handleFile} disabled={uploading} />
       <button type="button" onClick={handleView} style={{ marginLeft: 8, padding: "4px 10px" }}>
-        사진 보기
+        파일 보기
       </button>
       {msg && <span style={{ marginLeft: 8, fontSize: 13 }}>{msg}</span>}
-      {viewUrl && (
+      {viewUrl && viewMimeType === "application/pdf" && (
+        <div style={{ marginTop: 6 }}>
+          <a href={viewUrl} target="_blank" rel="noreferrer" style={{ display: "inline-block", padding: "6px 12px", background: "#f0f0f0", borderRadius: 6 }}>
+            📄 {viewFilename || "PDF 열기"}
+          </a>
+        </div>
+      )}
+      {viewUrl && viewMimeType !== "application/pdf" && (
         <div style={{ marginTop: 6 }}>
           <img src={viewUrl} alt="제출 사진" style={{ maxWidth: "100%", borderRadius: 8 }} />
         </div>
