@@ -26,6 +26,60 @@ type AssignedItem = {
 type Assignment = { assignmentId: string; items: AssignedItem[] };
 type TodayData = { assignments: Assignment[]; progress: number };
 
+function PhotoUploader(props: { assignedItemId: string; onDone: () => void }) {
+  const [uploading, setUploading] = useState(false);
+  const [msg, setMsg] = useState("");
+  const [viewUrl, setViewUrl] = useState("");
+
+  async function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files && e.target.files[0];
+    if (!file) return;
+    setUploading(true);
+    setMsg("");
+    const formData = new FormData();
+    formData.append("file", file);
+    const res = await fetch("/api/admin/assigned-items/" + props.assignedItemId + "/photo", {
+      method: "POST",
+      body: formData,
+    });
+    const data = await res.json().catch(function () {
+      return {};
+    });
+    if (res.ok) {
+      setMsg("업로드 완료");
+      props.onDone();
+    } else {
+      setMsg("실패: " + data.error);
+    }
+    setUploading(false);
+  }
+
+  async function handleView() {
+    const res = await fetch("/api/admin/assigned-items/" + props.assignedItemId + "/photo");
+    if (res.ok) {
+      const data = await res.json();
+      setViewUrl(data.url);
+    } else {
+      setMsg("아직 제출된 사진이 없습니다.");
+    }
+  }
+
+  return (
+    <div style={{ marginBottom: 6 }}>
+      <input type="file" accept="image/*" capture="environment" onChange={handleFile} disabled={uploading} />
+      <button type="button" onClick={handleView} style={{ marginLeft: 8, padding: "4px 10px" }}>
+        사진 보기
+      </button>
+      {msg && <span style={{ marginLeft: 8, fontSize: 13 }}>{msg}</span>}
+      {viewUrl && (
+        <div style={{ marginTop: 6 }}>
+          <img src={viewUrl} alt="제출 사진" style={{ maxWidth: "100%", borderRadius: 8 }} />
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function ChecklistTestPage() {
   const [loggedIn, setLoggedIn] = useState(false);
   const [loginId, setLoginId] = useState("");
@@ -316,11 +370,10 @@ export default function ChecklistTestPage() {
                     </a>
                   )}
 
-                  {(item.hasPhotoSubmission ||
-                    item.hasAudioSubmission ||
-                    item.hasVideoSubmission) && (
+                  {item.hasPhotoSubmission && <PhotoUploader assignedItemId={item.assignedItemId} onDone={function () { loadToday(viewStudentId); }} />}
+
+                  {(item.hasAudioSubmission || item.hasVideoSubmission) && (
                     <div style={{ fontSize: 13, color: "#aa6600", marginTop: 4 }}>
-                      {item.hasPhotoSubmission && "📷 사진제출 "}
                       {item.hasAudioSubmission && "🎤 음성제출 "}
                       {item.hasVideoSubmission && "🎬 영상제출 "}
                       — 업로드 기능은 다음 배치에서 지원 예정 (아직 제출 불가)
