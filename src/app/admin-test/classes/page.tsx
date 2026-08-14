@@ -10,6 +10,15 @@ type Student = {
 };
 type ClassItem = { classId: string; name: string; _count?: { students: number } };
 
+const DEFAULT_BULK_CLASSES = [
+  "Phonics 1", "Phonics 2", "Phonics 3",
+  "Basic 1", "Basic 2", "Basic 3",
+  "Starter 1", "Starter 2", "Starter 3",
+  "Jump 1", "Jump 2", "Jump 3",
+  "Up 1", "Up 2", "Up 3",
+  "Top 1", "Top 2", "Top 3",
+].join("\n");
+
 export default function ClassesTestPage() {
   const [loggedIn, setLoggedIn] = useState(false);
   const [loginId, setLoginId] = useState("");
@@ -22,6 +31,10 @@ export default function ClassesTestPage() {
   const [newClassName, setNewClassName] = useState("");
   const [classMsg, setClassMsg] = useState("");
   const [savingStudentId, setSavingStudentId] = useState<string | null>(null);
+
+  const [bulkText, setBulkText] = useState(DEFAULT_BULK_CLASSES);
+  const [bulkMsg, setBulkMsg] = useState("");
+  const [bulkRunning, setBulkRunning] = useState(false);
 
   async function refreshLists() {
     const [cRes, sRes] = await Promise.all([
@@ -77,6 +90,42 @@ export default function ClassesTestPage() {
     }
   }
 
+  async function handleBulkCreate() {
+    setBulkRunning(true);
+    setBulkMsg("");
+    const names = bulkText
+      .split("\n")
+      .map((s) => s.trim())
+      .filter((s) => s.length > 0);
+
+    const existingNames = new Set(classes.map((c) => c.name));
+    let created = 0;
+    let skipped = 0;
+    let failed = 0;
+
+    for (const name of names) {
+      if (existingNames.has(name)) {
+        skipped++;
+        continue;
+      }
+      const res = await fetch("/api/admin/classes", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name }),
+      });
+      if (res.ok) {
+        created++;
+        existingNames.add(name);
+      } else {
+        failed++;
+      }
+    }
+
+    setBulkMsg(`생성 ${created}개 / 이미 있어서 건너뜀 ${skipped}개 / 실패 ${failed}개`);
+    setBulkRunning(false);
+    await refreshLists();
+  }
+
   async function handleAssign(studentId: string, classId: string) {
     setSavingStudentId(studentId);
     await fetch(`/api/admin/students/${studentId}`, {
@@ -116,9 +165,10 @@ export default function ClassesTestPage() {
     <div style={{ maxWidth: 520, margin: "40px auto", padding: 16, fontFamily: "sans-serif" }}>
       <h1 style={{ fontSize: 20, marginBottom: 16 }}>클래스 관리</h1>
 
+      <h2 style={{ fontSize: 16, marginBottom: 8 }}>클래스 하나씩 만들기</h2>
       <form onSubmit={handleCreateClass} style={{ display: "flex", gap: 8, marginBottom: 8 }}>
         <input
-          placeholder="새 클래스 이름 (예: 2시 중급반)"
+          placeholder="새 클래스 이름 (예: Phonics 1)"
           value={newClassName}
           onChange={(e) => setNewClassName(e.target.value)}
           style={{ ...box, flex: 1 }}
@@ -129,6 +179,25 @@ export default function ClassesTestPage() {
         </button>
       </form>
       {classMsg && <p style={{ fontSize: 14 }}>{classMsg}</p>}
+
+      <h2 style={{ fontSize: 16, marginTop: 24, marginBottom: 8 }}>여러 개 한번에 만들기</h2>
+      <p style={{ fontSize: 13, color: "#666", marginBottom: 8 }}>
+        한 줄에 클래스 이름 하나씩. 보스턴영어 기본 18개 클래스가 미리 채워져 있습니다 — 그대로 아래 버튼만 눌러도 됩니다.
+      </p>
+      <textarea
+        value={bulkText}
+        onChange={(e) => setBulkText(e.target.value)}
+        rows={10}
+        style={{ ...box, fontFamily: "monospace", fontSize: 14 }}
+      />
+      <button
+        onClick={handleBulkCreate}
+        disabled={bulkRunning}
+        style={{ padding: 12, fontSize: 16, width: "100%", marginTop: 8 }}
+      >
+        {bulkRunning ? "생성 중..." : "위 목록 전체 만들기"}
+      </button>
+      {bulkMsg && <p style={{ fontSize: 14 }}>{bulkMsg}</p>}
 
       <h2 style={{ fontSize: 16, marginTop: 24, marginBottom: 8 }}>클래스 목록</h2>
       <ul style={{ paddingLeft: 20, marginBottom: 24 }}>
