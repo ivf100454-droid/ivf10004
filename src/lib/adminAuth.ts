@@ -4,8 +4,9 @@ import { prisma } from "./db";
 // 학생 인증(auth.ts)과 해시/검증 함수는 재사용하되(hashPassword, verifyPassword는
 // bcrypt 알고리즘 자체를 다루므로 주체가 학생이든 관리자든 동일 로직이 맞다),
 // 세션 생성/검증/무효화는 admin_sessions 테이블을 대상으로 별도 구현한다.
-export { hashPassword, verifyPassword } from "./auth";
-
+import { hashPassword as _hashPassword, verifyPassword as _verifyPassword } from "./auth";
+   export const hashPassword = _hashPassword;
+   export const verifyPassword = _verifyPassword;
 const SESSION_TTL_MS = 1000 * 60 * 60 * 24 * 14; // 14일 — 학생과 동일 정책, 추후 분리 가능
 
 export async function createAdminSession(adminId: string) {
