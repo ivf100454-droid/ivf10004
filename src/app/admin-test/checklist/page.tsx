@@ -102,9 +102,16 @@ function PhotoUploader(props: { assignedItemId: string; onDone: () => void }) {
       {msg && <span style={{ marginLeft: 8, fontSize: 13 }}>{msg}</span>}
       {viewUrl && viewMimeType === "application/pdf" && (
         <div style={{ marginTop: 6 }}>
-          <a href={viewUrl} target="_blank" rel="noreferrer" style={{ display: "inline-block", padding: "6px 12px", background: "#f0f0f0", borderRadius: 6 }}>
-            📄 {viewFilename || "PDF 열기"}
-          </a>
+          <iframe
+            src={viewUrl}
+            title={viewFilename || "제출 PDF"}
+            style={{ width: "100%", height: 500, border: "1px solid #ddd", borderRadius: 8 }}
+          />
+          <div style={{ marginTop: 4 }}>
+            <a href={viewUrl} target="_blank" rel="noreferrer" style={{ fontSize: 13 }}>
+              📄 {viewFilename || "새 창에서 크게 보기"}
+            </a>
+          </div>
         </div>
       )}
       {viewUrl && viewMimeType !== "application/pdf" && (
