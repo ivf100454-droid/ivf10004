@@ -5,8 +5,11 @@ import { getAdminFromRequest } from "@/lib/adminAuth";
 import { isAcademyToday } from "@/lib/timezone";
 import { uploadToR2, getSignedDownloadUrl } from "@/lib/storage";
 
-const MAX_SIZE = 8 * 1024 * 1024;
-const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp", "image/heic"];
+const MAX_IMAGE_SIZE = 8 * 1024 * 1024;
+const MAX_PDF_SIZE = 15 * 1024 * 1024;
+const ALLOWED_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp", "image/heic"];
+const ALLOWED_PDF_TYPES = ["application/pdf"];
+const ALLOWED_TYPES = ALLOWED_IMAGE_TYPES.concat(ALLOWED_PDF_TYPES);
 
 function evaluateCompleted(
   required: string[],
@@ -51,11 +54,14 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   if (!file || !(file instanceof File)) {
     return NextResponse.json({ error: "file 필드가 필요합니다." }, { status: 400 });
   }
-  if (file.size > MAX_SIZE) {
-    return NextResponse.json({ error: "파일이 너무 큽니다 (최대 8MB)." }, { status: 400 });
-  }
   if (ALLOWED_TYPES.indexOf(file.type) === -1) {
-    return NextResponse.json({ error: "지원하지 않는 이미지 형식입니다." }, { status: 400 });
+    return NextResponse.json({ error: "지원하지 않는 파일 형식입니다 (이미지 또는 PDF만 가능)." }, { status: 400 });
+  }
+  const isPdf = file.type === "application/pdf";
+  const maxSize = isPdf ? MAX_PDF_SIZE : MAX_IMAGE_SIZE;
+  if (file.size > maxSize) {
+    const limitLabel = isPdf ? "15MB" : "8MB";
+    return NextResponse.json({ error: "파일이 너무 큽니다 (최대 " + limitLabel + ")." }, { status: 400 });
   }
 
   const arrayBuffer = await file.arrayBuffer();
@@ -82,7 +88,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       data: {
         fileId: fileId,
         storageKey: storageKey,
-        originalFilename: file.name || "photo.jpg",
+        originalFilename: file.name || (isPdf ? "document.pdf" : "photo.jpg"),
         mimeType: file.type,
         sizeBytes: file.size,
         uploadedBy: admin.adminId,
@@ -131,5 +137,60 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
   }
 
   const url = await getSignedDownloadUrl(submission.file.storageKey, 300);
-  return NextResponse.json({ url: url, submittedAt: submission.submittedAt });
+  return NextResponse.json({
+    url: url,
+    submittedAt: submission.submittedAt,
+    mimeType: submission.file.mimeType,
+    filename: submission.file.originalFilename,
+  });
+}
+
+export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
+  const admin = await getAdminFromRequest(req);
+  if (!admin) return NextResponse.json({ error: "관리자 로그인이 필요합니다." }, { status: 401 });
+
+  const item = await prisma.assignedChecklistItem.findUnique({
+    where: { assignedItemId: params.id },
+    include: { assignment: true },
+  });
+  if (!item) return NextResponse.json({ error: "존재하지 않는 항목입니다." }, { status: 404 });
+  if (!isAcademyToday(item.assignment.checklistDate)) {
+    return NextResponse.json({ error: "과거 날짜의 항목은 수정할 수 없습니다." }, { status: 403 });
+  }
+
+  const submission = await prisma.photoSubmission.findFirst({
+    where: { assignedItemId: item.assignedItemId, status: "current" },
+    orderBy: { submittedAt: "desc" },
+  });
+  if (!submission) {
+    return NextResponse.json({ error: "삭제할 파일이 없습니다." }, { status: 404 });
+  }
+
+  const required: string[] = Array.isArray(item.requiredFeatures)
+    ? (item.requiredFeatures as string[])
+    : [];
+  const completed = evaluateCompleted(
+    required,
+    item.checked,
+    item.currentCount,
+    item.targetCount,
+    item.score,
+    false
+  );
+
+  await prisma.$transaction(async function (tx) {
+    await tx.photoSubmission.update({
+      where: { submissionId: submission.submissionId },
+      data: { status: "deleted" },
+    });
+    await tx.assignedChecklistItem.update({
+      where: { assignedItemId: item.assignedItemId },
+      data: {
+        completed: completed,
+        completedAt: completed ? new Date() : null,
+      },
+    });
+  });
+
+  return NextResponse.json({ ok: true });
 }
