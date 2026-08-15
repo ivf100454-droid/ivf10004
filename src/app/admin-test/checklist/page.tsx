@@ -68,11 +68,36 @@ function PhotoUploader(props: { assignedItemId: string; onDone: () => void }) {
     }
   }
 
+  async function handleDelete() {
+    if (!window.confirm("업로드된 파일을 삭제하시겠어요?")) return;
+    setUploading(true);
+    setMsg("");
+    const res = await fetch("/api/admin/assigned-items/" + props.assignedItemId + "/photo", {
+      method: "DELETE",
+    });
+    const data = await res.json().catch(function () {
+      return {};
+    });
+    if (res.ok) {
+      setMsg("삭제 완료");
+      setViewUrl("");
+      setViewMimeType("");
+      setViewFilename("");
+      props.onDone();
+    } else {
+      setMsg("삭제 실패: " + data.error);
+    }
+    setUploading(false);
+  }
+
   return (
     <div style={{ marginBottom: 6 }}>
       <input type="file" accept="image/*,application/pdf" onChange={handleFile} disabled={uploading} />
       <button type="button" onClick={handleView} style={{ marginLeft: 8, padding: "4px 10px" }}>
         파일 보기
+      </button>
+      <button type="button" onClick={handleDelete} disabled={uploading} style={{ marginLeft: 8, padding: "4px 10px", color: "#c0392b" }}>
+        삭제
       </button>
       {msg && <span style={{ marginLeft: 8, fontSize: 13 }}>{msg}</span>}
       {viewUrl && viewMimeType === "application/pdf" && (
@@ -187,6 +212,23 @@ export default function ChecklistTestPage() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(patch),
     });
+    await loadToday(viewStudentId);
+  }
+
+  async function resetItem(item: AssignedItem) {
+    if (!window.confirm("\"" + item.title + "\" 항목을 초기화하시겠어요? 체크/횟수/점수/제출 파일이 모두 지워집니다.")) return;
+    const patch: Record<string, unknown> = {};
+    if (item.hasCheck) patch.checked = false;
+    if (item.hasCount) patch.currentCount = 0;
+    if (item.hasScore) patch.score = null;
+    if (Object.keys(patch).length > 0) {
+      await patchItem(item.assignedItemId, patch);
+    }
+    if (item.hasPhotoSubmission) {
+      await fetch("/api/admin/assigned-items/" + item.assignedItemId + "/photo", {
+        method: "DELETE",
+      }).catch(function () {});
+    }
     await loadToday(viewStudentId);
   }
 
@@ -308,9 +350,18 @@ export default function ChecklistTestPage() {
                     background: item.completed ? "#f3fbf3" : "white",
                   }}
                 >
-                  <div style={{ fontSize: 16, fontWeight: 600, marginBottom: 8 }}>
-                    {item.completed ? "✅ " : "⬜ "}
-                    {item.title}
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                    <div style={{ fontSize: 16, fontWeight: 600 }}>
+                      {item.completed ? "✅ " : "⬜ "}
+                      {item.title}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => resetItem(item)}
+                      style={{ fontSize: 12, padding: "3px 8px", color: "#c0392b", background: "none", border: "1px solid #c0392b", borderRadius: 4 }}
+                    >
+                      초기화
+                    </button>
                   </div>
 
                   {item.hasCheck && (
