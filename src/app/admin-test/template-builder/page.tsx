@@ -13,6 +13,7 @@ type ItemDraft = {
   hasLink: boolean;
   linkUrl: string;
   linkLabel: string;
+  teachingVideoId: string;
   hasPhotoSubmission: boolean;
   hasAudioSubmission: boolean;
   hasVideoSubmission: boolean;
@@ -31,11 +32,14 @@ type Template = {
     hasScore: boolean;
     maxScore: number | null;
     linkUrl: string | null;
+    teachingVideoId: string | null;
     hasPhotoSubmission: boolean;
     hasAudioSubmission: boolean;
     hasVideoSubmission: boolean;
   }[];
 };
+
+type TeachingVideo = { videoId: string; title: string };
 
 const FEATURE_LABELS: Record<string, string> = {
   check: "☑ 체크",
@@ -58,6 +62,7 @@ function newItem(): ItemDraft {
     hasLink: false,
     linkUrl: "",
     linkLabel: "",
+    teachingVideoId: "",
     hasPhotoSubmission: false,
     hasAudioSubmission: false,
     hasVideoSubmission: false,
@@ -77,6 +82,7 @@ export default function TemplateBuilderPage() {
   const [saving, setSaving] = useState(false);
 
   const [templates, setTemplates] = useState<Template[]>([]);
+  const [teachingVideos, setTeachingVideos] = useState<TeachingVideo[]>([]);
 
   async function refresh() {
     const res = await fetch("/api/admin/templates");
@@ -86,6 +92,11 @@ export default function TemplateBuilderPage() {
     }
     setLoggedIn(true);
     setTemplates(await res.json());
+    const vRes = await fetch("/api/admin/teaching-videos");
+    if (vRes.ok) {
+      const vData = await vRes.json();
+      setTeachingVideos(vData.map((v: { videoId: string; title: string }) => ({ videoId: v.videoId, title: v.title })));
+    }
   }
 
   useEffect(() => {
@@ -169,6 +180,7 @@ export default function TemplateBuilderPage() {
           maxScore: it.hasScore ? Number(it.maxScore) : undefined,
           linkUrl: it.hasLink ? it.linkUrl : undefined,
           linkLabel: it.hasLink ? it.linkLabel : undefined,
+          teachingVideoId: it.teachingVideoId || undefined,
           hasPhotoSubmission: it.hasPhotoSubmission,
           hasAudioSubmission: it.hasAudioSubmission,
           hasVideoSubmission: it.hasVideoSubmission,
@@ -222,8 +234,7 @@ export default function TemplateBuilderPage() {
     <div style={{ maxWidth: 640, margin: "24px auto", padding: 16, fontFamily: "sans-serif" }}>
       <h1 style={{ fontSize: 20, marginBottom: 4 }}>체크리스트 템플릿 만들기</h1>
       <p style={{ fontSize: 13, color: "#888", marginBottom: 16 }}>
-        📷🎤🎬 제출 기능은 이번 배치에서는 <b>선택만 가능</b>하고 실제 파일 업로드는 아직 동작하지
-        않습니다 (다음 배치에서 R2 연동 후 활성화 예정).
+        📷🎤🎬 사진·음성·영상 제출과 🎓 학습영상 연결 모두 실제로 작동합니다.
       </p>
 
       <form onSubmit={handleSave}>
@@ -361,6 +372,29 @@ export default function TemplateBuilderPage() {
                 </div>
               )}
 
+              <div style={{ marginBottom: 8 }}>
+                <label style={{ fontSize: 14, display: "block", marginBottom: 4 }}>
+                  🎓 학습영상 연결 (선택)
+                </label>
+                <select
+                  value={it.teachingVideoId}
+                  onChange={(e) => updateItem(it.uiId, { teachingVideoId: e.target.value })}
+                  style={box}
+                >
+                  <option value="">연결 안 함</option>
+                  {teachingVideos.map((v) => (
+                    <option key={v.videoId} value={v.videoId}>
+                      {v.title}
+                    </option>
+                  ))}
+                </select>
+                {teachingVideos.length === 0 && (
+                  <p style={{ fontSize: 12, color: "#aaa", marginTop: 4 }}>
+                    아직 업로드된 학습영상이 없습니다 (학습영상 라이브러리 화면에서 먼저 업로드하세요).
+                  </p>
+                )}
+              </div>
+
               {enabledFeatures.length > 0 && (
                 <div style={{ fontSize: 13, color: "#555", marginTop: 4 }}>
                   완료조건으로 포함할 기능:{" "}
@@ -401,6 +435,7 @@ export default function TemplateBuilderPage() {
                 it.hasCount && `🔢${it.targetCount}회`,
                 it.hasScore && `💯/${it.maxScore}`,
                 it.linkUrl && "🔗",
+                it.teachingVideoId && "🎓",
                 it.hasPhotoSubmission && "📷",
                 it.hasAudioSubmission && "🎤",
                 it.hasVideoSubmission && "🎬",
