@@ -300,6 +300,8 @@ export default function ChecklistTestPage() {
 
   const [viewStudentId, setViewStudentId] = useState("");
   const [todayData, setTodayData] = useState<TodayData | null>(null);
+  const [shareLinkUrl, setShareLinkUrl] = useState("");
+  const [shareLinkMsg, setShareLinkMsg] = useState("");
 
   async function refreshBase() {
     const sRes = await fetch("/api/admin/students");
@@ -411,6 +413,30 @@ export default function ChecklistTestPage() {
     await loadToday(viewStudentId);
   }
 
+  async function handleCreateShareLink() {
+    if (!viewStudentId) {
+      setShareLinkMsg("학생을 먼저 선택해주세요.");
+      return;
+    }
+    setShareLinkMsg("링크 생성 중...");
+    setShareLinkUrl("");
+    const res = await fetch("/api/admin/students/" + viewStudentId + "/share-link", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({}),
+    });
+    const data = await res.json().catch(function () {
+      return {};
+    });
+    if (res.ok) {
+      const url = window.location.origin + "/share/" + data.token;
+      setShareLinkUrl(url);
+      setShareLinkMsg("링크가 생성되었습니다 (30일간 유효). 아래 주소를 복사해서 학부모님께 전달하세요.");
+    } else {
+      setShareLinkMsg("실패: " + data.error);
+    }
+  }
+
   const box: React.CSSProperties = {
     padding: 10,
     fontSize: 16,
@@ -490,6 +516,23 @@ export default function ChecklistTestPage() {
           </option>
         ))}
       </select>
+
+      <button
+        type="button"
+        onClick={handleCreateShareLink}
+        style={{ marginTop: 8, padding: "8px 12px", fontSize: 14 }}
+      >
+        학부모 공유링크 만들기 (오늘 날짜)
+      </button>
+      {shareLinkMsg && <p style={{ fontSize: 13, marginTop: 6 }}>{shareLinkMsg}</p>}
+      {shareLinkUrl && (
+        <input
+          readOnly
+          value={shareLinkUrl}
+          onFocus={(e) => e.target.select()}
+          style={{ ...box, marginTop: 6, fontSize: 13 }}
+        />
+      )}
 
       {todayData && (
         <div style={{ marginTop: 16 }}>
