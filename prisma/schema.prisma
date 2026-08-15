@@ -9,6 +9,11 @@
 //   - audio_submissions UNIQUE(assigned_item_id) WHERE status = 'current'
 // 이번 스키마에서 새로 추가되는 photo_submissions, video_submissions도 같은 패턴의
 // partial unique index가 필요하며, 다음 배치에서 동일 파일에 추가한다.
+//
+// V3 추가분(활동 라이브러리): Activity 모델을 신설해 "체크박스/횟수/점수/제출 기능"과
+// "관리자가 올리는 자료"를 하나의 재사용 가능한 활동 단위로 묶는다. 기존 TemplateItem의
+// 기능 플래그 필드들은 과거 데이터 호환을 위해 그대로 남겨두고, activityId를 추가로
+// 붙여 새 템플릿 만들기 화면부터는 활동 참조 방식을 쓴다.
 
 generator client {
   provider = "prisma-client-js"
@@ -71,6 +76,7 @@ model AdminSession {
 model Class {
   classId   String   @id @default(uuid()) @map("class_id")
   name      String
+  sortOrder Int      @default(0) @map("sort_order")
   createdAt DateTime @default(now()) @map("created_at")
 
   students Student[]
@@ -123,7 +129,7 @@ model AuthSession {
 
 /// 관리자가 업로드하는 "가르치는 영상" 라이브러리 (문법 설명, 팝송 학습영상 등).
 /// 학생이 제출하는 영상(VideoSubmission)과는 용도·권한이 완전히 달라 별도 테이블로 분리한다.
-/// 여러 템플릿/여러 배정 항목에서 같은 영상을 재사용할 수 있다.
+/// 여러 템플릿/여러 배정 항목/여러 활동에서 같은 영상을 재사용할 수 있다.
 model TeachingVideo {
   videoId          String   @id @default(uuid()) @map("video_id")
   title            String
@@ -134,10 +140,43 @@ model TeachingVideo {
   createdByAdmin   Administrator? @relation(fields: [createdByAdminId], references: [adminId], onDelete: SetNull)
   createdAt        DateTime @default(now()) @map("created_at")
 
-  templateItems TemplateItem[]
-  assignedItems AssignedChecklistItem[]
+  templateItems     TemplateItem[]
+  assignedItems     AssignedChecklistItem[]
+  activityMaterials Activity[]
 
   @@map("teaching_videos")
+}
+
+/// 재사용 가능한 "활동" 라이브러리 (팝송부르기, 단어시험, 본문읽기 등).
+/// 관리자가 활동을 한 번 만들어두면 여러 템플릿에서 재사용할 수 있다.
+/// "학생이 해야 할 것"(제출 기능)과 "관리자가 학생에게 보여줄 자료"(참고자료)를
+/// 하나의 활동 안에 함께 정의한다.
+model Activity {
+  activityId String   @id @default(uuid()) @map("activity_id")
+  name       String
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  hasCheck           Boolean @default(false) @map("has_check")
+  hasCount           Boolean @default(false) @map("has_count")
+  targetCount        Int?    @map("target_count")
+  hasScore           Boolean @default(false) @map("has_score")
+  maxScore            Int?    @map("max_score")
+  hasPhotoSubmission Boolean @default(false) @map("has_photo_submission")
+  hasAudioSubmission Boolean @default(false) @map("has_audio_submission")
+  hasVideoSubmission Boolean @default(false) @map("has_video_submission")
+  hasFileSubmission  Boolean @default(false) @map("has_file_submission")
+
+  materialLinkUrl     String? @map("material_link_url")
+  materialVideoId     String? @map("material_video_id")
+  materialVideo       TeachingVideo? @relation(fields: [materialVideoId], references: [videoId], onDelete: SetNull)
+  materialPhotoFileId String? @map("material_photo_file_id")
+  materialPhotoFile   FileMetadata? @relation("ActivityMaterialPhoto", fields: [materialPhotoFileId], references: [fileId], onDelete: SetNull)
+  materialDocFileId   String? @map("material_doc_file_id")
+  materialDocFile     FileMetadata? @relation("ActivityMaterialDoc", fields: [materialDocFileId], references: [fileId], onDelete: SetNull)
+
+  templateItems TemplateItem[]
+
+  @@map("activities")
 }
 
 model ChecklistTemplate {
@@ -153,16 +192,21 @@ model ChecklistTemplate {
 
 /// 템플릿 항목. 아래 "기능 플래그"들은 AssignedChecklistItem과 1:1로 동일한 구조를 가진다 —
 /// 배정 시 이 필드들을 값 그대로 복사한다(진행 상태 관련 필드는 제외).
+/// activityId가 있으면 새 방식(활동 라이브러리에서 담은 항목)이고, 없으면 예전 방식
+/// (기능 플래그를 항목에 직접 입력)이다 — 과거 데이터 호환을 위해 두 방식 모두 유지한다.
 model TemplateItem {
   templateItemId String   @id @default(uuid()) @map("template_item_id")
   templateId     String   @map("template_id")
   template       ChecklistTemplate @relation(fields: [templateId], references: [templateId], onDelete: Cascade)
 
+  activityId String?   @map("activity_id")
+  activity   Activity? @relation(fields: [activityId], references: [activityId], onDelete: SetNull)
+
   title          String
   sortOrder      Int      @default(0) @map("sort_order")
   isProgressItem Boolean  @default(true) @map("is_progress_item")
 
-  // 기능 플래그 — 관리자가 항목 하나에 여러 개를 동시에 켤 수 있다.
+  // 기능 플래그 — 관리자가 항목 하나에 여러 개를 동시에 켤 수 있다. (예전 방식용, 하위 호환)
   hasCheck            Boolean @default(false) @map("has_check")
   hasCount            Boolean @default(false) @map("has_count")
   targetCount         Int?    @map("target_count")
@@ -198,6 +242,11 @@ model ChecklistAssignment {
   createdByAdmin    Administrator? @relation(fields: [createdByAdminId], references: [adminId], onDelete: SetNull)
   createdAt         DateTime @default(now()) @map("created_at")
 
+  // 관리자가 학생의 그날 학습을 확인하고 "확인 완료"를 누른 시점 — 학생별 월간 캘린더에
+  // 파란색으로 표시하는 기준이 된다(진행률 100%와는 별개의 "관리자 리뷰 완료" 개념).
+  reviewedAt        DateTime? @map("reviewed_at")
+  reviewedByAdminId String?   @map("reviewed_by_admin_id")
+
   items AssignedChecklistItem[]
 
   @@index([studentId, checklistDate])
@@ -219,7 +268,7 @@ model AssignedChecklistItem {
   hasCount           Boolean @default(false) @map("has_count")
   targetCount        Int?    @map("target_count")
   hasScore           Boolean @default(false) @map("has_score")
-  maxScore           Int?    @map("max_score")
+  maxScore            Int?    @map("max_score")
   linkUrl            String? @map("link_url")
   linkLabel          String? @map("link_label")
   teachingVideoId    String? @map("teaching_video_id")
@@ -259,11 +308,13 @@ model FileMetadata {
   uploadedBy       String   @map("uploaded_by") // account_id or admin_id
   uploadedAt       DateTime @default(now()) @map("uploaded_at")
 
-  imageAttachments ImageAttachment[]
-  audioSubmissions AudioSubmission[]
-  photoSubmissions PhotoSubmission[]
-  videoSubmissions VideoSubmission[]
-  teachingVideos   TeachingVideo[]
+  imageAttachments       ImageAttachment[]
+  audioSubmissions       AudioSubmission[]
+  photoSubmissions       PhotoSubmission[]
+  videoSubmissions       VideoSubmission[]
+  teachingVideos         TeachingVideo[]
+  activityMaterialPhotos Activity[] @relation("ActivityMaterialPhoto")
+  activityMaterialDocs   Activity[] @relation("ActivityMaterialDoc")
 
   @@map("file_metadata")
 }
