@@ -32,10 +32,12 @@ type Template = {
     hasScore: boolean;
     maxScore: number | null;
     linkUrl: string | null;
+    linkLabel: string | null;
     teachingVideoId: string | null;
     hasPhotoSubmission: boolean;
     hasAudioSubmission: boolean;
     hasVideoSubmission: boolean;
+    requiredFeatures: string[];
   }[];
 };
 
@@ -80,6 +82,7 @@ export default function TemplateBuilderPage() {
   const [items, setItems] = useState<ItemDraft[]>([newItem()]);
   const [saveMsg, setSaveMsg] = useState("");
   const [saving, setSaving] = useState(false);
+  const [editingTemplateId, setEditingTemplateId] = useState("");
 
   const [templates, setTemplates] = useState<Template[]>([]);
   const [teachingVideos, setTeachingVideos] = useState<TeachingVideo[]>([]);
@@ -164,6 +167,51 @@ export default function TemplateBuilderPage() {
     setItems((prev) => prev.filter((it) => it.uiId !== uiId));
   }
 
+  function loadForEdit(t: Template) {
+    setEditingTemplateId(t.templateId);
+    setTemplateName(t.name);
+    setItems(
+      t.items.map((it) => ({
+        uiId: Math.random().toString(36).slice(2),
+        title: it.title,
+        hasCheck: it.hasCheck,
+        hasCount: it.hasCount,
+        targetCount: it.targetCount != null ? String(it.targetCount) : "3",
+        hasScore: it.hasScore,
+        maxScore: it.maxScore != null ? String(it.maxScore) : "100",
+        hasLink: !!it.linkUrl,
+        linkUrl: it.linkUrl || "",
+        linkLabel: it.linkLabel || "",
+        teachingVideoId: it.teachingVideoId || "",
+        hasPhotoSubmission: it.hasPhotoSubmission,
+        hasAudioSubmission: it.hasAudioSubmission,
+        hasVideoSubmission: it.hasVideoSubmission,
+        requiredFeatures: Object.fromEntries((it.requiredFeatures || []).map((f) => [f, true])),
+      }))
+    );
+    setSaveMsg("");
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  function cancelEdit() {
+    setEditingTemplateId("");
+    setTemplateName("");
+    setItems([newItem()]);
+    setSaveMsg("");
+  }
+
+  async function handleDeleteTemplate(templateId: string, name: string) {
+    if (!window.confirm(`"${name}" 템플릿을 삭제하시겠어요? (이미 배정된 학생 기록은 남아있습니다)`)) return;
+    const res = await fetch("/api/admin/templates/" + templateId, { method: "DELETE" });
+    const data = await res.json().catch(() => ({}));
+    if (res.ok) {
+      if (editingTemplateId === templateId) cancelEdit();
+      await refresh();
+    } else {
+      alert("삭제 실패: " + data.error);
+    }
+  }
+
   async function handleSave(e: React.FormEvent) {
     e.preventDefault();
     setSaveMsg("");
@@ -187,16 +235,20 @@ export default function TemplateBuilderPage() {
           requiredFeatures: Object.keys(it.requiredFeatures).filter((k) => it.requiredFeatures[k]),
         })),
       };
-      const res = await fetch("/api/admin/templates", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
+      const res = await fetch(
+        editingTemplateId ? "/api/admin/templates/" + editingTemplateId : "/api/admin/templates",
+        {
+          method: editingTemplateId ? "PUT" : "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        }
+      );
       const data = await res.json().catch(() => ({}));
       if (res.ok) {
-        setSaveMsg(`"${data.name}" 템플릿 생성됨 (항목 ${data.items.length}개)`);
+        setSaveMsg(editingTemplateId ? `"${data.name}" 템플릿 수정됨` : `"${data.name}" 템플릿 생성됨 (항목 ${data.items.length}개)`);
         setTemplateName("");
         setItems([newItem()]);
+        setEditingTemplateId("");
         await refresh();
       } else {
         setSaveMsg(`실패: ${data.error}`);
@@ -232,10 +284,21 @@ export default function TemplateBuilderPage() {
 
   return (
     <div style={{ maxWidth: 640, margin: "24px auto", padding: 16, fontFamily: "sans-serif" }}>
-      <h1 style={{ fontSize: 20, marginBottom: 4 }}>체크리스트 템플릿 만들기</h1>
+      <h1 style={{ fontSize: 20, marginBottom: 4 }}>
+        {editingTemplateId ? "체크리스트 템플릿 수정" : "체크리스트 템플릿 만들기"}
+      </h1>
       <p style={{ fontSize: 13, color: "#888", marginBottom: 16 }}>
         📷🎤🎬 사진·음성·영상 제출과 🎓 학습영상 연결 모두 실제로 작동합니다.
       </p>
+      {editingTemplateId && (
+        <button
+          type="button"
+          onClick={cancelEdit}
+          style={{ marginBottom: 12, padding: "6px 12px", fontSize: 13 }}
+        >
+          ✕ 수정 취소 (새 템플릿 만들기로 돌아가기)
+        </button>
+      )}
 
       <form onSubmit={handleSave}>
         <input
@@ -350,108 +413,3 @@ export default function TemplateBuilderPage() {
                   type="number"
                   min={1}
                   placeholder="만점"
-                  value={it.maxScore}
-                  onChange={(e) => updateItem(it.uiId, { maxScore: e.target.value })}
-                  style={{ ...box, marginBottom: 8, maxWidth: 140 }}
-                />
-              )}
-              {it.hasLink && (
-                <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
-                  <input
-                    placeholder="링크 URL (https://...)"
-                    value={it.linkUrl}
-                    onChange={(e) => updateItem(it.uiId, { linkUrl: e.target.value })}
-                    style={{ ...box, flex: 2 }}
-                  />
-                  <input
-                    placeholder="버튼 이름 (예: 팝송 보기)"
-                    value={it.linkLabel}
-                    onChange={(e) => updateItem(it.uiId, { linkLabel: e.target.value })}
-                    style={{ ...box, flex: 1 }}
-                  />
-                </div>
-              )}
-
-              <div style={{ marginBottom: 8 }}>
-                <label style={{ fontSize: 14, display: "block", marginBottom: 4 }}>
-                  🎓 학습영상 연결 (선택)
-                </label>
-                <select
-                  value={it.teachingVideoId}
-                  onChange={(e) => updateItem(it.uiId, { teachingVideoId: e.target.value })}
-                  style={box}
-                >
-                  <option value="">연결 안 함</option>
-                  {teachingVideos.map((v) => (
-                    <option key={v.videoId} value={v.videoId}>
-                      {v.title}
-                    </option>
-                  ))}
-                </select>
-                {teachingVideos.length === 0 && (
-                  <p style={{ fontSize: 12, color: "#aaa", marginTop: 4 }}>
-                    아직 업로드된 학습영상이 없습니다 (학습영상 라이브러리 화면에서 먼저 업로드하세요).
-                  </p>
-                )}
-              </div>
-
-              {enabledFeatures.length > 0 && (
-                <div style={{ fontSize: 13, color: "#555", marginTop: 4 }}>
-                  완료조건으로 포함할 기능:{" "}
-                  {enabledFeatures.map((f) => (
-                    <label key={f} style={{ marginRight: 10 }}>
-                      <input
-                        type="checkbox"
-                        checked={!!it.requiredFeatures[f]}
-                        onChange={(e) => toggleRequired(it.uiId, f, e.target.checked)}
-                      />{" "}
-                      {FEATURE_LABELS[f]}
-                    </label>
-                  ))}
-                </div>
-              )}
-            </div>
-          );
-        })}
-
-        <button type="button" onClick={addItem} style={{ padding: 10, marginBottom: 16, width: "100%" }}>
-          + 항목 추가
-        </button>
-
-        <button type="submit" disabled={saving} style={{ padding: 14, fontSize: 16, width: "100%" }}>
-          {saving ? "저장 중..." : "템플릿 저장"}
-        </button>
-      </form>
-      {saveMsg && <p style={{ marginTop: 8 }}>{saveMsg}</p>}
-
-      <h2 style={{ fontSize: 16, marginTop: 32, marginBottom: 8 }}>기존 템플릿</h2>
-      {templates.map((t) => (
-        <div key={t.templateId} style={{ marginBottom: 16 }}>
-          <strong>{t.name}</strong>
-          <ul style={{ paddingLeft: 20, fontSize: 14 }}>
-            {t.items.map((it) => {
-              const tags = [
-                it.hasCheck && "☑",
-                it.hasCount && `🔢${it.targetCount}회`,
-                it.hasScore && `💯/${it.maxScore}`,
-                it.linkUrl && "🔗",
-                it.teachingVideoId && "🎓",
-                it.hasPhotoSubmission && "📷",
-                it.hasAudioSubmission && "🎤",
-                it.hasVideoSubmission && "🎬",
-              ]
-                .filter(Boolean)
-                .join(" ");
-              return (
-                <li key={it.templateItemId}>
-                  {it.title} — {tags}
-                </li>
-              );
-            })}
-          </ul>
-        </div>
-      ))}
-      {templates.length === 0 && <p style={{ color: "#888" }}>아직 템플릿이 없습니다.</p>}
-    </div>
-  );
-}
