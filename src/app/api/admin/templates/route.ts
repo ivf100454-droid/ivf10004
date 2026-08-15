@@ -31,6 +31,7 @@ type ItemInput = {
   maxScore?: number;
   linkUrl?: string;
   linkLabel?: string;
+  teachingVideoId?: string;
   hasPhotoSubmission?: boolean;
   hasAudioSubmission?: boolean;
   hasVideoSubmission?: boolean;
@@ -68,7 +69,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: `${i + 1}번째 항목에 제목이 없습니다.` }, { status: 400 });
     }
     const anyFeature =
-      item.hasCheck || item.hasCount || item.hasScore || item.linkUrl ||
+      item.hasCheck || item.hasCount || item.hasScore || item.linkUrl || item.teachingVideoId ||
       item.hasPhotoSubmission || item.hasAudioSubmission || item.hasVideoSubmission;
     if (!anyFeature) {
       return NextResponse.json(
@@ -87,6 +88,15 @@ export async function POST(req: NextRequest) {
         { error: `"${item.title}" 항목: 점수형은 만점(1 이상)이 필요합니다.` },
         { status: 400 }
       );
+    }
+    if (item.teachingVideoId) {
+      const video = await prisma.teachingVideo.findUnique({ where: { videoId: item.teachingVideoId } });
+      if (!video) {
+        return NextResponse.json(
+          { error: `"${item.title}" 항목: 존재하지 않는 학습영상입니다.` },
+          { status: 400 }
+        );
+      }
     }
     const required = item.requiredFeatures ?? [];
     const invalid = required.filter((f) => !VALID_FEATURES.includes(f as any));
@@ -112,6 +122,7 @@ export async function POST(req: NextRequest) {
           maxScore: item.hasScore ? item.maxScore : null,
           linkUrl: item.linkUrl?.trim() || null,
           linkLabel: item.linkLabel?.trim() || null,
+          teachingVideoId: item.teachingVideoId || null,
           hasPhotoSubmission: !!item.hasPhotoSubmission,
           hasAudioSubmission: !!item.hasAudioSubmission,
           hasVideoSubmission: !!item.hasVideoSubmission,
