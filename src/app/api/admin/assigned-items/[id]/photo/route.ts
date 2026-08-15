@@ -181,7 +181,7 @@ export async function DELETE(req: NextRequest, { params }: { params: { id: strin
   await prisma.$transaction(async function (tx) {
     await tx.photoSubmission.update({
       where: { submissionId: submission.submissionId },
-      data: { status: "deleted" },
+      data: { status: "superseded" },
     });
     await tx.assignedChecklistItem.update({
       where: { assignedItemId: item.assignedItemId },
