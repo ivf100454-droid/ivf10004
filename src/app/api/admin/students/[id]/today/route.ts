@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getAdminFromRequest } from "@/lib/adminAuth";
 import { getAcademyToday } from "@/lib/timezone";
+import { getSignedDownloadUrl } from "@/lib/storage";
 
 /**
  * 특정 학생의 "오늘" 체크리스트 배정·항목·진행률을 반환한다.
@@ -28,5 +29,27 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
   const progress =
     progressItems.length === 0 ? 0 : Math.round((completedCount / progressItems.length) * 100);
 
-  return NextResponse.json({ date: todayStr, assignments, progress });
+  const videoIds = Array.from(
+    new Set(allItems.map((i) => i.teachingVideoId).filter(function (v): v is string { return !!v; }))
+  );
+  const videos = videoIds.length
+    ? await prisma.teachingVideo.findMany({
+        where: { videoId: { in: videoIds } },
+        include: { file: true },
+      })
+    : [];
+  const videoMap: Record<string, { title: string; url: string }> = {};
+  for (const v of videos) {
+    videoMap[v.videoId] = { title: v.title, url: await getSignedDownloadUrl(v.file.storageKey, 600) };
+  }
+
+  const assignmentsOut = assignments.map((a) => ({
+    ...a,
+    items: a.items.map((item) => ({
+      ...item,
+      teachingVideo: item.teachingVideoId ? videoMap[item.teachingVideoId] || null : null,
+    })),
+  }));
+
+  return NextResponse.json({ date: todayStr, assignments: assignmentsOut, progress });
 }
