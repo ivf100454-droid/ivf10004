@@ -123,6 +123,168 @@ function PhotoUploader(props: { assignedItemId: string; onDone: () => void }) {
   );
 }
 
+function AudioUploader(props: { assignedItemId: string; onDone: () => void }) {
+  const [uploading, setUploading] = useState(false);
+  const [msg, setMsg] = useState("");
+  const [viewUrl, setViewUrl] = useState("");
+  const [viewFilename, setViewFilename] = useState("");
+
+  async function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files && e.target.files[0];
+    if (!file) return;
+    setUploading(true);
+    setMsg("");
+    const formData = new FormData();
+    formData.append("file", file);
+    const res = await fetch("/api/admin/assigned-items/" + props.assignedItemId + "/audio", {
+      method: "POST",
+      body: formData,
+    });
+    const data = await res.json().catch(function () {
+      return {};
+    });
+    if (res.ok) {
+      setMsg("업로드 완료");
+      props.onDone();
+    } else {
+      setMsg("실패: " + data.error);
+    }
+    setUploading(false);
+  }
+
+  async function handleView() {
+    const res = await fetch("/api/admin/assigned-items/" + props.assignedItemId + "/audio");
+    if (res.ok) {
+      const data = await res.json();
+      setViewUrl(data.url);
+      setViewFilename(data.filename || "");
+    } else {
+      setMsg("아직 제출된 파일이 없습니다.");
+    }
+  }
+
+  async function handleDelete() {
+    if (!window.confirm("업로드된 음성 파일을 삭제하시겠어요?")) return;
+    setUploading(true);
+    setMsg("");
+    const res = await fetch("/api/admin/assigned-items/" + props.assignedItemId + "/audio", {
+      method: "DELETE",
+    });
+    const data = await res.json().catch(function () {
+      return {};
+    });
+    if (res.ok) {
+      setMsg("삭제 완료");
+      setViewUrl("");
+      setViewFilename("");
+      props.onDone();
+    } else {
+      setMsg("삭제 실패: " + data.error);
+    }
+    setUploading(false);
+  }
+
+  return (
+    <div style={{ marginBottom: 6 }}>
+      <input type="file" accept="audio/*" onChange={handleFile} disabled={uploading} />
+      <button type="button" onClick={handleView} style={{ marginLeft: 8, padding: "4px 10px" }}>
+        파일 보기
+      </button>
+      <button type="button" onClick={handleDelete} disabled={uploading} style={{ marginLeft: 8, padding: "4px 10px", color: "#c0392b" }}>
+        삭제
+      </button>
+      {msg && <span style={{ marginLeft: 8, fontSize: 13 }}>{msg}</span>}
+      {viewUrl && (
+        <div style={{ marginTop: 6 }}>
+          <audio controls src={viewUrl} style={{ width: "100%" }} />
+          {viewFilename && <div style={{ fontSize: 12, color: "#888", marginTop: 2 }}>{viewFilename}</div>}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function VideoUploader(props: { assignedItemId: string; onDone: () => void }) {
+  const [uploading, setUploading] = useState(false);
+  const [msg, setMsg] = useState("");
+  const [viewUrl, setViewUrl] = useState("");
+  const [viewFilename, setViewFilename] = useState("");
+
+  async function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files && e.target.files[0];
+    if (!file) return;
+    setUploading(true);
+    setMsg("");
+    const formData = new FormData();
+    formData.append("file", file);
+    const res = await fetch("/api/admin/assigned-items/" + props.assignedItemId + "/video", {
+      method: "POST",
+      body: formData,
+    });
+    const data = await res.json().catch(function () {
+      return {};
+    });
+    if (res.ok) {
+      setMsg("업로드 완료");
+      props.onDone();
+    } else {
+      setMsg("실패: " + data.error);
+    }
+    setUploading(false);
+  }
+
+  async function handleView() {
+    const res = await fetch("/api/admin/assigned-items/" + props.assignedItemId + "/video");
+    if (res.ok) {
+      const data = await res.json();
+      setViewUrl(data.url);
+      setViewFilename(data.filename || "");
+    } else {
+      setMsg("아직 제출된 파일이 없습니다.");
+    }
+  }
+
+  async function handleDelete() {
+    if (!window.confirm("업로드된 영상 파일을 삭제하시겠어요?")) return;
+    setUploading(true);
+    setMsg("");
+    const res = await fetch("/api/admin/assigned-items/" + props.assignedItemId + "/video", {
+      method: "DELETE",
+    });
+    const data = await res.json().catch(function () {
+      return {};
+    });
+    if (res.ok) {
+      setMsg("삭제 완료");
+      setViewUrl("");
+      setViewFilename("");
+      props.onDone();
+    } else {
+      setMsg("삭제 실패: " + data.error);
+    }
+    setUploading(false);
+  }
+
+  return (
+    <div style={{ marginBottom: 6 }}>
+      <input type="file" accept="video/*" onChange={handleFile} disabled={uploading} />
+      <button type="button" onClick={handleView} style={{ marginLeft: 8, padding: "4px 10px" }}>
+        파일 보기
+      </button>
+      <button type="button" onClick={handleDelete} disabled={uploading} style={{ marginLeft: 8, padding: "4px 10px", color: "#c0392b" }}>
+        삭제
+      </button>
+      {msg && <span style={{ marginLeft: 8, fontSize: 13 }}>{msg}</span>}
+      {viewUrl && (
+        <div style={{ marginTop: 6 }}>
+          <video controls src={viewUrl} style={{ width: "100%", maxHeight: 400, borderRadius: 8 }} />
+          {viewFilename && <div style={{ fontSize: 12, color: "#888", marginTop: 2 }}>{viewFilename}</div>}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function ChecklistTestPage() {
   const [loggedIn, setLoggedIn] = useState(false);
   const [loginId, setLoginId] = useState("");
@@ -233,6 +395,16 @@ export default function ChecklistTestPage() {
     }
     if (item.hasPhotoSubmission) {
       await fetch("/api/admin/assigned-items/" + item.assignedItemId + "/photo", {
+        method: "DELETE",
+      }).catch(function () {});
+    }
+    if (item.hasAudioSubmission) {
+      await fetch("/api/admin/assigned-items/" + item.assignedItemId + "/audio", {
+        method: "DELETE",
+      }).catch(function () {});
+    }
+    if (item.hasVideoSubmission) {
+      await fetch("/api/admin/assigned-items/" + item.assignedItemId + "/video", {
         method: "DELETE",
       }).catch(function () {});
     }
@@ -441,13 +613,9 @@ export default function ChecklistTestPage() {
 
                   {item.hasPhotoSubmission && <PhotoUploader assignedItemId={item.assignedItemId} onDone={function () { loadToday(viewStudentId); }} />}
 
-                  {(item.hasAudioSubmission || item.hasVideoSubmission) && (
-                    <div style={{ fontSize: 13, color: "#aa6600", marginTop: 4 }}>
-                      {item.hasAudioSubmission && "🎤 음성제출 "}
-                      {item.hasVideoSubmission && "🎬 영상제출 "}
-                      — 업로드 기능은 다음 배치에서 지원 예정 (아직 제출 불가)
-                    </div>
-                  )}
+                  {item.hasAudioSubmission && <AudioUploader assignedItemId={item.assignedItemId} onDone={function () { loadToday(viewStudentId); }} />}
+
+                  {item.hasVideoSubmission && <VideoUploader assignedItemId={item.assignedItemId} onDone={function () { loadToday(viewStudentId); }} />}
                 </div>
               ))}
             </div>
