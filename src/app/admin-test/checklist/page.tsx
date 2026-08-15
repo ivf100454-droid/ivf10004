@@ -22,6 +22,7 @@ type AssignedItem = {
   hasAudioSubmission: boolean;
   hasVideoSubmission: boolean;
   completed: boolean;
+  teachingVideo: { title: string; url: string } | null;
 };
 type Assignment = { assignmentId: string; items: AssignedItem[] };
 type TodayData = { assignments: Assignment[]; progress: number };
@@ -652,6 +653,15 @@ export default function ChecklistTestPage() {
                     <a href={item.linkUrl} target="_blank" rel="noreferrer" style={{ display: "inline-block", marginBottom: 6 }}>
                       🔗 {item.linkLabel || "자료 열기"}
                     </a>
+                  )}
+
+                  {item.teachingVideo && (
+                    <div style={{ marginBottom: 8 }}>
+                      <div style={{ fontSize: 13, color: "#555", marginBottom: 4 }}>
+                        🎓 학습영상: {item.teachingVideo.title}
+                      </div>
+                      <video controls src={item.teachingVideo.url} style={{ width: "100%", maxHeight: 360, borderRadius: 8 }} />
+                    </div>
                   )}
 
                   {item.hasPhotoSubmission && <PhotoUploader assignedItemId={item.assignedItemId} onDone={function () { loadToday(viewStudentId); }} />}
