@@ -2,15 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getAdminFromRequest } from "@/lib/adminAuth";
 
-const VALID_FEATURES = [
-  "check",
-  "count",
-  "score",
-  "photoSubmission",
-  "audioSubmission",
-  "videoSubmission",
-] as const;
-
 export async function GET(req: NextRequest) {
   const admin = await getAdminFromRequest(req);
   if (!admin) return NextResponse.json({ error: "관리자 로그인이 필요합니다." }, { status: 401 });
@@ -22,112 +13,66 @@ export async function GET(req: NextRequest) {
   return NextResponse.json(templates);
 }
 
-type ItemInput = {
-  title: string;
-  hasCheck?: boolean;
-  hasCount?: boolean;
-  targetCount?: number;
-  hasScore?: boolean;
-  maxScore?: number;
-  linkUrl?: string;
-  linkLabel?: string;
-  teachingVideoId?: string;
-  hasPhotoSubmission?: boolean;
-  hasAudioSubmission?: boolean;
-  hasVideoSubmission?: boolean;
-  requiredFeatures?: string[];
-};
-
 /**
- * 템플릿 생성. 항목 하나에 체크/횟수/점수/링크/사진제출/음성제출/영상제출을
- * 자유롭게 조합할 수 있다(기능 플래그 구조).
+ * 템플릿 생성 — 활동 라이브러리에서 고른 활동들(activityIds)을 순서대로 담아
+ * 템플릿 항목으로 복사한다. 항목 하나하나를 직접 입력하던 예전 방식은
+ * templates/[id]/route.ts와의 하위 호환을 위해 스키마상으로는 남아있지만,
+ * 이 엔드포인트는 activityIds 방식만 받는다.
  *
- * 이번 배치의 범위: 관리자 교사영상(teachingVideoId)은 아직 지원하지 않는다 —
- * 실제 영상 파일을 저장할 스토리지(R2) 연동이 아직 없어서, 영상 업로드가
- * 없는 상태로 teachingVideoId를 받아도 참조 무결성을 보장할 방법이 없기
- * 때문이다. 사진/음성/영상 "제출" 기능 플래그는 미리 받아 저장해두지만
- * (학생 화면에서 나중에 쓸 수 있도록), 실제 업로드·저장 파이프라인은
- * 다음 배치에서 R2 연동과 함께 추가한다 — 지금은 플래그만 켜질 뿐 실제
- * 제출은 아직 안 된다는 점을 관리자 화면에 명확히 표시해야 한다.
+ * 참고: Activity.hasFileSubmission(파일 제출)은 TemplateItem에 별도 필드가
+ * 없어 hasPhotoSubmission 칸에 합쳐서 저장한다(사진 제출 칸이 PDF도 이미
+ * 받을 수 있음). 완전히 분리된 "파일 제출" 칸은 다음 배치 과제로 남긴다.
  */
 export async function POST(req: NextRequest) {
   const admin = await getAdminFromRequest(req);
   if (!admin) return NextResponse.json({ error: "관리자 로그인이 필요합니다." }, { status: 401 });
 
   const body = await req.json().catch(() => null);
-  if (!body?.name || !Array.isArray(body?.items) || body.items.length === 0) {
-    return NextResponse.json(
-      { error: "템플릿 이름과 항목 목록(items)이 필요합니다." },
-      { status: 400 }
-    );
+  const name = String(body?.name || "").trim();
+  const activityIds: string[] = Array.isArray(body?.activityIds) ? body.activityIds : [];
+
+  if (!name) return NextResponse.json({ error: "템플릿 이름을 입력하세요." }, { status: 400 });
+  if (activityIds.length === 0) {
+    return NextResponse.json({ error: "체크리스트에 담을 활동을 하나 이상 골라주세요." }, { status: 400 });
   }
 
-  const items: ItemInput[] = body.items;
-
-  for (const [i, item] of items.entries()) {
-    if (!item.title?.trim()) {
-      return NextResponse.json({ error: `${i + 1}번째 항목에 제목이 없습니다.` }, { status: 400 });
-    }
-    const anyFeature =
-      item.hasCheck || item.hasCount || item.hasScore || item.linkUrl || item.teachingVideoId ||
-      item.hasPhotoSubmission || item.hasAudioSubmission || item.hasVideoSubmission;
-    if (!anyFeature) {
-      return NextResponse.json(
-        { error: `"${item.title}" 항목에 최소 하나의 기능을 선택해야 합니다.` },
-        { status: 400 }
-      );
-    }
-    if (item.hasCount && (!item.targetCount || item.targetCount < 1)) {
-      return NextResponse.json(
-        { error: `"${item.title}" 항목: 횟수형은 목표 횟수(1 이상)가 필요합니다.` },
-        { status: 400 }
-      );
-    }
-    if (item.hasScore && (!item.maxScore || item.maxScore < 1)) {
-      return NextResponse.json(
-        { error: `"${item.title}" 항목: 점수형은 만점(1 이상)이 필요합니다.` },
-        { status: 400 }
-      );
-    }
-    if (item.teachingVideoId) {
-      const video = await prisma.teachingVideo.findUnique({ where: { videoId: item.teachingVideoId } });
-      if (!video) {
-        return NextResponse.json(
-          { error: `"${item.title}" 항목: 존재하지 않는 학습영상입니다.` },
-          { status: 400 }
-        );
-      }
-    }
-    const required = item.requiredFeatures ?? [];
-    const invalid = required.filter((f) => !VALID_FEATURES.includes(f as any));
-    if (invalid.length > 0) {
-      return NextResponse.json(
-        { error: `"${item.title}" 항목: 알 수 없는 완료조건 기능(${invalid.join(", ")})` },
-        { status: 400 }
-      );
-    }
+  const activities = await prisma.activity.findMany({ where: { activityId: { in: activityIds } } });
+  if (activities.length !== activityIds.length) {
+    return NextResponse.json({ error: "존재하지 않는 활동이 포함되어 있습니다." }, { status: 400 });
   }
+  const byId = new Map(activities.map((a) => [a.activityId, a]));
 
   const template = await prisma.checklistTemplate.create({
     data: {
-      name: body.name,
+      name: name,
       items: {
-        create: items.map((item, i) => ({
-          title: item.title.trim(),
-          sortOrder: i,
-          hasCheck: !!item.hasCheck,
-          hasCount: !!item.hasCount,
-          targetCount: item.hasCount ? item.targetCount : null,
-          hasScore: !!item.hasScore,
-          maxScore: item.hasScore ? item.maxScore : null,
-          linkUrl: item.linkUrl?.trim() || null,
-          linkLabel: item.linkLabel?.trim() || null,
-          teachingVideoId: item.teachingVideoId || null,
-          hasPhotoSubmission: !!item.hasPhotoSubmission,
-          hasAudioSubmission: !!item.hasAudioSubmission,
-          hasVideoSubmission: !!item.hasVideoSubmission,
-          requiredFeatures: item.requiredFeatures ?? [],
-        })),
+        create: activityIds.map((activityId, i) => {
+          const a = byId.get(activityId)!;
+          const required: string[] = [];
+          if (a.hasCheck) required.push("check");
+          if (a.hasCount) required.push("count");
+          if (a.hasScore) required.push("score");
+          if (a.hasPhotoSubmission || a.hasFileSubmission) required.push("photoSubmission");
+          if (a.hasAudioSubmission) required.push("audioSubmission");
+          if (a.hasVideoSubmission) required.push("videoSubmission");
+
+          return {
+            activityId: a.activityId,
+            title: a.name,
+            sortOrder: i,
+            hasCheck: a.hasCheck,
+            hasCount: a.hasCount,
+            targetCount: a.targetCount,
+            hasScore: a.hasScore,
+            maxScore: a.maxScore,
+            linkUrl: a.materialLinkUrl,
+            teachingVideoId: a.materialVideoId,
+            hasPhotoSubmission: a.hasPhotoSubmission || a.hasFileSubmission,
+            hasAudioSubmission: a.hasAudioSubmission,
+            hasVideoSubmission: a.hasVideoSubmission,
+            requiredFeatures: required,
+          };
+        }),
       },
     },
     include: { items: true },
