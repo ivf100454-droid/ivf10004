@@ -49,25 +49,22 @@ async function serializeActivity(a: {
   };
 }
 
-export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(req: NextRequest) {
   const admin = await getAdminFromRequest(req);
   if (!admin) return NextResponse.json({ error: "관리자 로그인이 필요합니다." }, { status: 401 });
 
-  const activity = await prisma.activity.findUnique({
-    where: { activityId: params.id },
+  const activities = await prisma.activity.findMany({
     include: { materialVideo: true, materialPhotoFile: true, materialDocFile: true },
+    orderBy: { createdAt: "desc" },
   });
-  if (!activity) return NextResponse.json({ error: "존재하지 않는 활동입니다." }, { status: 404 });
 
-  return NextResponse.json(await serializeActivity(activity));
+  const out = await Promise.all(activities.map(serializeActivity));
+  return NextResponse.json(out);
 }
 
-export async function PUT(req: NextRequest, { params }: { params: { id: string } }) {
+export async function POST(req: NextRequest) {
   const admin = await getAdminFromRequest(req);
   if (!admin) return NextResponse.json({ error: "관리자 로그인이 필요합니다." }, { status: 401 });
-
-  const existing = await prisma.activity.findUnique({ where: { activityId: params.id } });
-  if (!existing) return NextResponse.json({ error: "존재하지 않는 활동입니다." }, { status: 404 });
 
   const formData = await req.formData().catch(function () {
     return null;
@@ -96,16 +93,10 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
     return NextResponse.json({ error: "만점을 입력하세요 (10 이상)." }, { status: 400 });
   }
 
-  const removeLink = toBool(formData.get("removeMaterialLink"));
-  const removeVideo = toBool(formData.get("removeMaterialVideo"));
-  const removePhoto = toBool(formData.get("removeMaterialPhoto"));
-  const removeDoc = toBool(formData.get("removeMaterialDoc"));
+  const anySubmit = hasCheck || hasCount || hasScore || hasPhotoSubmission || hasAudioSubmission || hasVideoSubmission || hasFileSubmission;
 
-  const materialLinkUrlRaw = String(formData.get("materialLinkUrl") || "").trim();
-  const materialLinkUrl = removeLink ? null : materialLinkUrlRaw || existing.materialLinkUrl;
-
-  const materialVideoIdRaw = String(formData.get("materialVideoId") || "").trim();
-  let materialVideoId = removeVideo ? null : materialVideoIdRaw || existing.materialVideoId;
+  const materialLinkUrl = String(formData.get("materialLinkUrl") || "").trim() || null;
+  const materialVideoId = String(formData.get("materialVideoId") || "").trim() || null;
   if (materialVideoId) {
     const video = await prisma.teachingVideo.findUnique({ where: { videoId: materialVideoId } });
     if (!video) return NextResponse.json({ error: "존재하지 않는 학습영상입니다." }, { status: 400 });
@@ -114,10 +105,16 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
   const photoFile = formData.get("materialPhotoFile");
   const docFile = formData.get("materialDocFile");
 
-  const result = await prisma.$transaction(async function (tx) {
-    let materialPhotoFileId = removePhoto ? null : existing.materialPhotoFileId;
-    let materialDocFileId = removeDoc ? null : existing.materialDocFileId;
+  let materialPhotoFileId: string | null = null;
+  let materialDocFileId: string | null = null;
 
+  const anyMaterial = !!materialLinkUrl || !!materialVideoId || (photoFile instanceof File) || (docFile instanceof File);
+
+  if (!anySubmit && !anyMaterial) {
+    return NextResponse.json({ error: "최소 하나의 항목을 선택하세요." }, { status: 400 });
+  }
+
+  const activityId = await prisma.$transaction(async function (tx) {
     if (photoFile instanceof File && photoFile.size > 0) {
       if (ALLOWED_PHOTO_TYPES.indexOf(photoFile.type) === -1) {
         throw new Error("참고 사진은 이미지 파일만 가능합니다.");
@@ -163,8 +160,7 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
       materialDocFileId = meta.fileId;
     }
 
-    const updated = await tx.activity.update({
-      where: { activityId: params.id },
+    const activity = await tx.activity.create({
       data: {
         name: name,
         hasCheck: hasCheck,
@@ -181,37 +177,16 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
         materialPhotoFileId: materialPhotoFileId,
         materialDocFileId: materialDocFileId,
       },
-      include: { materialVideo: true, materialPhotoFile: true, materialDocFile: true },
     });
 
-    return updated;
+    return activity.activityId;
   }).catch(function (e) {
     return { error: e.message || "저장에 실패했습니다." };
   });
 
-  if ("error" in result) {
-    return NextResponse.json({ error: result.error }, { status: 400 });
+  if (typeof activityId !== "string") {
+    return NextResponse.json({ error: (activityId as { error: string }).error }, { status: 400 });
   }
 
-  return NextResponse.json(await serializeActivity(result));
-}
-
-export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
-  const admin = await getAdminFromRequest(req);
-  if (!admin) return NextResponse.json({ error: "관리자 로그인이 필요합니다." }, { status: 401 });
-
-  const existing = await prisma.activity.findUnique({ where: { activityId: params.id } });
-  if (!existing) return NextResponse.json({ error: "존재하지 않는 활동입니다." }, { status: 404 });
-
-  const inUse = await prisma.templateItem.findFirst({ where: { activityId: params.id } });
-  if (inUse) {
-    return NextResponse.json(
-      { error: "이 활동은 템플릿에서 사용 중이라 삭제할 수 없습니다. 먼저 템플릿에서 이 활동을 빼주세요." },
-      { status: 409 }
-    );
-  }
-
-  await prisma.activity.delete({ where: { activityId: params.id } });
-
-  return NextResponse.json({ ok: true });
+  return NextResponse.json({ activityId: activityId, name: name }, { status: 201 });
 }
