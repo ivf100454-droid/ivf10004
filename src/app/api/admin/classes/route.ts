@@ -7,10 +7,19 @@ export async function GET(req: NextRequest) {
   if (!admin) return NextResponse.json({ error: "관리자 로그인이 필요합니다." }, { status: 401 });
 
   const classes = await prisma.class.findMany({
-    orderBy: { createdAt: "asc" },
-    include: { _count: { select: { students: true } } },
+    orderBy: { sortOrder: "asc" },
+    include: { _count: { select: { students: true } }, template: true },
   });
-  return NextResponse.json(classes);
+  return NextResponse.json(
+    classes.map((c) => ({
+      classId: c.classId,
+      name: c.name,
+      sortOrder: c.sortOrder,
+      studentCount: c._count.students,
+      templateId: c.templateId,
+      templateName: c.template ? c.template.name : null,
+    }))
+  );
 }
 
 export async function POST(req: NextRequest) {
@@ -18,9 +27,14 @@ export async function POST(req: NextRequest) {
   if (!admin) return NextResponse.json({ error: "관리자 로그인이 필요합니다." }, { status: 401 });
 
   const body = await req.json().catch(() => null);
-  if (!body?.name) {
+  const name = String(body?.name || "").trim();
+  if (!name) {
     return NextResponse.json({ error: "클래스 이름을 입력해주세요." }, { status: 400 });
   }
-  const created = await prisma.class.create({ data: { name: body.name } });
+
+  const last = await prisma.class.findFirst({ orderBy: { sortOrder: "desc" } });
+  const nextOrder = last ? last.sortOrder + 1 : 0;
+
+  const created = await prisma.class.create({ data: { name: name, sortOrder: nextOrder } });
   return NextResponse.json(created, { status: 201 });
 }
