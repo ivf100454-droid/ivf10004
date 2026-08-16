@@ -74,10 +74,12 @@ model AdminSession {
 }
 
 model Class {
-  classId   String   @id @default(uuid()) @map("class_id")
-  name      String
-  sortOrder Int      @default(0) @map("sort_order")
-  createdAt DateTime @default(now()) @map("created_at")
+  classId    String   @id @default(uuid()) @map("class_id")
+  name       String
+  sortOrder  Int      @default(0) @map("sort_order")
+  templateId String?  @map("template_id")
+  template   ChecklistTemplate? @relation(fields: [templateId], references: [templateId], onDelete: SetNull)
+  createdAt  DateTime @default(now()) @map("created_at")
 
   students Student[]
 
@@ -186,6 +188,7 @@ model ChecklistTemplate {
 
   items       TemplateItem[]
   assignments ChecklistAssignment[]
+  classes     Class[]
 
   @@map("checklist_templates")
 }
