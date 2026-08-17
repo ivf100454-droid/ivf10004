@@ -37,9 +37,10 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
             if (a.hasCheck) required.push("check");
             if (a.hasCount) required.push("count");
             if (a.hasScore) required.push("score");
-            if (a.hasPhotoSubmission || a.hasFileSubmission) required.push("photoSubmission");
+            if (a.hasPhotoSubmission) required.push("photoSubmission");
             if (a.hasAudioSubmission) required.push("audioSubmission");
             if (a.hasVideoSubmission) required.push("videoSubmission");
+            if (a.hasFileSubmission) required.push("fileSubmission");
 
             return {
               activityId: a.activityId,
@@ -52,9 +53,10 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
               maxScore: a.maxScore,
               linkUrl: a.materialLinkUrl,
               teachingVideoId: a.materialVideoId,
-              hasPhotoSubmission: a.hasPhotoSubmission || a.hasFileSubmission,
+              hasPhotoSubmission: a.hasPhotoSubmission,
               hasAudioSubmission: a.hasAudioSubmission,
               hasVideoSubmission: a.hasVideoSubmission,
+              hasFileSubmission: a.hasFileSubmission,
               requiredFeatures: required,
             };
           }),
