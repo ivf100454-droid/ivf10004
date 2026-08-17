@@ -11,7 +11,8 @@ function evaluateCompleted(
   score: number | null,
   hasCurrentPhoto: boolean,
   hasCurrentAudio: boolean,
-  hasCurrentVideo: boolean
+  hasCurrentVideo: boolean,
+  hasCurrentFile: boolean
 ) {
   if (required.length === 0) return checked === true;
   return required.every(function (feature) {
@@ -21,6 +22,7 @@ function evaluateCompleted(
     if (feature === "photoSubmission") return hasCurrentPhoto;
     if (feature === "audioSubmission") return hasCurrentAudio;
     if (feature === "videoSubmission") return hasCurrentVideo;
+    if (feature === "fileSubmission") return hasCurrentFile;
     return false;
   });
 }
@@ -55,7 +57,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     typeof body.currentCount === "number" ? body.currentCount : item.currentCount;
   const score = Object.prototype.hasOwnProperty.call(body, "score") ? body.score : item.score;
 
-  const [currentPhoto, currentAudio, currentVideo] = await Promise.all([
+  const [currentPhoto, currentAudio, currentVideo, currentFile] = await Promise.all([
     prisma.photoSubmission.findFirst({
       where: { assignedItemId: item.assignedItemId, status: "current" },
     }),
@@ -63,6 +65,9 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       where: { assignedItemId: item.assignedItemId, status: "current" },
     }),
     prisma.videoSubmission.findFirst({
+      where: { assignedItemId: item.assignedItemId, status: "current" },
+    }),
+    prisma.fileSubmission.findFirst({
       where: { assignedItemId: item.assignedItemId, status: "current" },
     }),
   ]);
@@ -78,7 +83,8 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     score,
     !!currentPhoto,
     !!currentAudio,
-    !!currentVideo
+    !!currentVideo,
+    !!currentFile
   );
 
   const updated = await prisma.assignedChecklistItem.update({
