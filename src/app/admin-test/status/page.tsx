@@ -10,8 +10,9 @@ type AssignedItem = {
   title: string;
   completed: boolean;
 };
-type Assignment = { assignmentId: string; reviewedAt: string | null; items: AssignedItem[] };
+type Assignment = { assignmentId: string; items: AssignedItem[] };
 type TodayData = { date: string; assignments: Assignment[]; progress: number };
+type CalendarDay = { day: number; progress: number };
 
 const MONTH_NAMES = ["1월", "2월", "3월", "4월", "5월", "6월", "7월", "8월", "9월", "10월", "11월", "12월"];
 
@@ -29,12 +30,11 @@ export default function StatusPage() {
   const [activeStudentId, setActiveStudentId] = useState("");
 
   const [today, setToday] = useState<TodayData | null>(null);
-  const [reviewedDays, setReviewedDays] = useState<number[]>([]);
+  const [calendarDays, setCalendarDays] = useState<CalendarDay[]>([]);
   const now = new Date();
   const [calYear, setCalYear] = useState(now.getFullYear());
   const [calMonth, setCalMonth] = useState(now.getMonth() + 1);
 
-  const [reviewMsg, setReviewMsg] = useState("");
   const [shareMsg, setShareMsg] = useState("");
   const [shareUrl, setShareUrl] = useState("");
 
@@ -80,7 +80,7 @@ export default function StatusPage() {
     const res = await fetch(`/api/admin/students/${studentId}/calendar?year=${year}&month=${month}`);
     if (res.ok) {
       const data = await res.json();
-      setReviewedDays(data.reviewedDays);
+      setCalendarDays(data.days);
     }
   }
 
@@ -96,7 +96,6 @@ export default function StatusPage() {
     setScreen("detail");
     setShareUrl("");
     setShareMsg("");
-    setReviewMsg("");
     const y = now.getFullYear();
     const m = now.getMonth() + 1;
     setCalYear(y);
@@ -117,22 +116,6 @@ export default function StatusPage() {
     setCalYear(y);
     setCalMonth(m);
     await loadCalendar(activeStudentId, y, m);
-  }
-
-  async function handleReview() {
-    setReviewMsg("처리 중...");
-    const res = await fetch(`/api/admin/students/${activeStudentId}/review`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({}),
-    });
-    const data = await res.json().catch(() => ({}));
-    if (res.ok) {
-      setReviewMsg("확인 완료로 표시했습니다.");
-      await Promise.all([loadToday(activeStudentId), loadCalendar(activeStudentId, calYear, calMonth)]);
-    } else {
-      setReviewMsg("실패: " + data.error);
-    }
   }
 
   async function handleShareLink() {
@@ -206,7 +189,10 @@ export default function StatusPage() {
     for (let i = 0; i < firstDay; i++) cells.push(null);
     for (let d = 1; d <= daysInMonth; d++) cells.push(d);
 
-    const reviewedToday = today && today.assignments.length > 0 && today.assignments.every((a) => !!a.reviewedAt);
+    const progressByDay: Record<number, number> = {};
+    calendarDays.forEach((d) => {
+      progressByDay[d.day] = d.progress;
+    });
 
     return (
       <div style={{ maxWidth: 480, margin: "24px auto", padding: 16, fontFamily: "sans-serif" }}>
@@ -230,26 +216,13 @@ export default function StatusPage() {
                   {item.completed ? "✅" : "⬜"} {item.title}
                 </div>
               ))}
-              <button
-                onClick={handleReview}
-                style={{
-                  width: "100%",
-                  marginTop: 12,
-                  padding: 12,
-                  fontSize: 15,
-                  background: reviewedToday ? "#e8f5e9" : "#222",
-                  color: reviewedToday ? "#2e7d32" : "#fff",
-                  border: "none",
-                  borderRadius: 8,
-                }}
-              >
-                {reviewedToday ? "확인 완료됨" : "확인 완료"}
-              </button>
-              {reviewMsg && <p style={{ fontSize: 13, marginTop: 6 }}>{reviewMsg}</p>}
             </>
           )}
         </div>
 
+        <p style={{ fontSize: 12, color: "#888", marginBottom: 8 }}>
+          날짜 안 숫자는 그날의 진행률입니다 (10% 이상이면 파란색으로 표시)
+        </p>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
           <button onClick={() => navMonth(-1)} style={{ padding: "6px 12px" }}>
             ‹
@@ -262,23 +235,35 @@ export default function StatusPage() {
           </button>
         </div>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 4, marginBottom: 20 }}>
-          {cells.map((d, i) => (
-            <div
-              key={i}
-              style={{
-                aspectRatio: "1",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                fontSize: 13,
-                borderRadius: "50%",
-                background: d && reviewedDays.indexOf(d) !== -1 ? "#4a90d9" : "transparent",
-                color: d && reviewedDays.indexOf(d) !== -1 ? "#fff" : "#333",
-              }}
-            >
-              {d || ""}
-            </div>
-          ))}
+          {cells.map((d, i) => {
+            const progress = d ? progressByDay[d] : undefined;
+            const isActive = progress !== undefined && progress >= 10;
+            return (
+              <div
+                key={i}
+                style={{
+                  aspectRatio: "1",
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  borderRadius: "50%",
+                  background: isActive ? "#4a90d9" : "transparent",
+                  color: isActive ? "#fff" : "#333",
+                }}
+              >
+                {d ? (
+                  isActive ? (
+                    <span style={{ fontSize: 11, fontWeight: 600, lineHeight: 1.1 }}>{progress}%</span>
+                  ) : (
+                    <span style={{ fontSize: 13 }}>{d}</span>
+                  )
+                ) : (
+                  ""
+                )}
+              </div>
+            );
+          })}
         </div>
 
         <button onClick={handleShareLink} style={{ width: "100%", padding: 12, fontSize: 15, marginBottom: 8 }}>
