@@ -11,13 +11,6 @@ type Student = {
 };
 type ClassItem = { classId: string; name: string };
 
-function genId() {
-  return "std" + Math.floor(1000 + Math.random() * 9000);
-}
-function genPw() {
-  return Math.random().toString(36).slice(2, 8);
-}
-
 export default function StudentsPage() {
   const [loggedIn, setLoggedIn] = useState(false);
   const [loginId, setLoginId] = useState("");
@@ -41,7 +34,7 @@ export default function StudentsPage() {
   const [editClassId, setEditClassId] = useState("");
   const [editMsg, setEditMsg] = useState("");
   const [resetMsg, setResetMsg] = useState("");
-  const [newIssuedPassword, setNewIssuedPassword] = useState("");
+  const [resetPasswordInput, setResetPasswordInput] = useState("");
 
   async function refresh() {
     const [sRes, cRes] = await Promise.all([fetch("/api/admin/students"), fetch("/api/admin/classes")]);
@@ -85,11 +78,6 @@ export default function StudentsPage() {
     setMode("add");
   }
 
-  function autoFillCreds() {
-    setNewLoginId(genId());
-    setNewPassword(genPw());
-  }
-
   async function handleRegister(e: React.FormEvent) {
     e.preventDefault();
     setSaving(true);
@@ -120,7 +108,7 @@ export default function StudentsPage() {
     setEditClassId(s.currentClassId || "");
     setEditMsg("");
     setResetMsg("");
-    setNewIssuedPassword("");
+    setResetPasswordInput("");
     setMode("edit");
   }
 
@@ -155,18 +143,21 @@ export default function StudentsPage() {
   }
 
   async function handleResetPassword() {
-    if (!confirm("이 학생의 비밀번호를 새로 발급하시겠어요? 기존 비밀번호로는 더 이상 로그인할 수 없습니다.")) return;
-    setResetMsg("발급 중...");
-    setNewIssuedPassword("");
+    if (!resetPasswordInput.trim()) {
+      setResetMsg("새 비밀번호를 입력하세요.");
+      return;
+    }
+    if (!confirm("이 비밀번호로 변경하시겠어요? 기존 비밀번호로는 더 이상 로그인할 수 없습니다.")) return;
+    setResetMsg("변경 중...");
     const res = await fetch("/api/admin/students/" + editingId + "/reset-password", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({}),
+      body: JSON.stringify({ newPassword: resetPasswordInput.trim() }),
     });
     const data = await res.json().catch(() => ({}));
     if (res.ok) {
-      setNewIssuedPassword(data.newPassword);
-      setResetMsg("새 비밀번호가 발급되었습니다. 학생에게 전달해주세요 (다시 볼 수 없으니 지금 저장해두세요).");
+      setResetMsg(`비밀번호가 "${data.newPassword}"(으)로 변경되었습니다.`);
+      setResetPasswordInput("");
     } else {
       setResetMsg("실패: " + data.error);
     }
@@ -210,13 +201,10 @@ export default function StudentsPage() {
           <label style={{ fontSize: 13, color: "#666" }}>이름</label>
           <input placeholder="학생 이름" value={name} onChange={(e) => setName(e.target.value)} style={box} required />
 
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-            <label style={{ fontSize: 13, color: "#666" }}>아이디 / 비밀번호</label>
-            <button type="button" onClick={autoFillCreds} style={{ fontSize: 12, padding: "4px 8px" }}>
-              자동생성
-            </button>
-          </div>
+          <label style={{ fontSize: 13, color: "#666" }}>아이디</label>
           <input placeholder="아이디" value={newLoginId} onChange={(e) => setNewLoginId(e.target.value)} style={box} required />
+
+          <label style={{ fontSize: 13, color: "#666" }}>비밀번호</label>
           <input placeholder="비밀번호" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} style={box} required />
 
           <label style={{ fontSize: 13, color: "#666" }}>수업 배치</label>
@@ -269,19 +257,20 @@ export default function StudentsPage() {
         </select>
 
         <div style={{ background: "#f5f5f5", borderRadius: 8, padding: 14, marginBottom: 16 }}>
-          <p style={{ fontSize: 14, fontWeight: 600, marginBottom: 8 }}>비밀번호</p>
+          <p style={{ fontSize: 14, fontWeight: 600, marginBottom: 8 }}>비밀번호 변경</p>
           <p style={{ fontSize: 13, color: "#888", marginBottom: 8 }}>
-            보안을 위해 저장된 비밀번호는 확인할 수 없습니다. 학생이 잊어버렸다면 새로 발급해주세요.
+            보안을 위해 저장된 비밀번호는 확인할 수 없습니다. 새 비밀번호를 직접 정해서 입력해주세요.
           </p>
+          <input
+            placeholder="새 비밀번호"
+            value={resetPasswordInput}
+            onChange={(e) => setResetPasswordInput(e.target.value)}
+            style={{ ...box, marginBottom: 8 }}
+          />
           <button onClick={handleResetPassword} style={{ padding: 10, fontSize: 14, width: "100%" }}>
-            새 비밀번호 발급
+            비밀번호 변경
           </button>
           {resetMsg && <p style={{ fontSize: 13, marginTop: 8 }}>{resetMsg}</p>}
-          {newIssuedPassword && (
-            <div style={{ marginTop: 8, padding: 10, background: "#fff3cd", borderRadius: 6, fontSize: 15, fontWeight: 600, textAlign: "center" }}>
-              {newIssuedPassword}
-            </div>
-          )}
         </div>
 
         {editMsg && <p style={{ fontSize: 13, color: "crimson", marginBottom: 8 }}>{editMsg}</p>}
