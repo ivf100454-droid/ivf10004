@@ -222,6 +222,7 @@ model TemplateItem {
   hasPhotoSubmission  Boolean @default(false) @map("has_photo_submission")
   hasAudioSubmission  Boolean @default(false) @map("has_audio_submission")
   hasVideoSubmission  Boolean @default(false) @map("has_video_submission")
+  hasFileSubmission   Boolean @default(false) @map("has_file_submission")
 
   // 완료 조건에 포함할 기능들의 목록. 예: ["check","count","videoSubmission"]
   // (11번 요구사항: 단순 열람 요소인 link/teachingVideo는 이 목록에 넣지 않는 것이 기본.)
@@ -279,6 +280,7 @@ model AssignedChecklistItem {
   hasPhotoSubmission Boolean @default(false) @map("has_photo_submission")
   hasAudioSubmission Boolean @default(false) @map("has_audio_submission")
   hasVideoSubmission Boolean @default(false) @map("has_video_submission")
+  hasFileSubmission  Boolean @default(false) @map("has_file_submission")
   requiredFeatures   Json @default("[]") @map("required_features")
 
   // 아래부터는 "진행 상태" — 학생/관리자가 실제로 입력·제출하며 채워지는 값들.
@@ -297,6 +299,7 @@ model AssignedChecklistItem {
   audioSubmissions  AudioSubmission[]
   photoSubmissions  PhotoSubmission[]
   videoSubmissions  VideoSubmission[]
+  fileSubmissions   FileSubmission[]
 
   @@index([assignmentId])
   @@map("assigned_checklist_items")
@@ -315,6 +318,7 @@ model FileMetadata {
   audioSubmissions       AudioSubmission[]
   photoSubmissions       PhotoSubmission[]
   videoSubmissions       VideoSubmission[]
+  fileSubmissions        FileSubmission[]
   teachingVideos         TeachingVideo[]
   activityMaterialPhotos Activity[] @relation("ActivityMaterialPhoto")
   activityMaterialDocs   Activity[] @relation("ActivityMaterialDoc")
@@ -385,6 +389,23 @@ model VideoSubmission {
 
   @@index([assignedItemId])
   @@map("video_submissions")
+}
+
+/// 학생이 제출하는 범용 파일 제출("파일 제출" 아이콘). 사진/음성/영상 제출과 달리
+/// 형식을 가리지 않고(이미지, PDF, 음성, 영상, 문서 등 무엇이든) 받는 용도이며,
+/// 다른 제출 모델들과 동일한 current/superseded 패턴을 따른다.
+model FileSubmission {
+  submissionId   String   @id @default(uuid()) @map("submission_id")
+  assignedItemId String   @map("assigned_item_id")
+  assignedItem   AssignedChecklistItem @relation(fields: [assignedItemId], references: [assignedItemId], onDelete: Cascade)
+  studentId      String   @map("student_id")
+  fileId         String   @map("file_id")
+  file           FileMetadata @relation(fields: [fileId], references: [fileId], onDelete: Restrict)
+  status         SubmissionStatus @default(current)
+  submittedAt    DateTime @default(now()) @map("submitted_at")
+
+  @@index([assignedItemId])
+  @@map("file_submissions")
 }
 
 /// 학부모 공유 링크. 로그인 없이 토큰만으로 특정 학생의 특정 날짜 학습결과를
