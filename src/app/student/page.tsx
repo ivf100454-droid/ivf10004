@@ -20,6 +20,7 @@ type AssignedItem = {
   hasPhotoSubmission: boolean;
   hasAudioSubmission: boolean;
   hasVideoSubmission: boolean;
+  hasFileSubmission: boolean;
   completed: boolean;
   teachingVideo: TeachingVideo | null;
 };
@@ -40,7 +41,7 @@ function scoreOptions(maxScore: number) {
 
 function SubmissionUploader(props: {
   assignedItemId: string;
-  kind: "photo" | "audio" | "video";
+  kind: "photo" | "audio" | "video" | "file";
   accept: string;
   label: string;
   onDone: () => void;
@@ -104,6 +105,11 @@ function SubmissionUploader(props: {
     setUploading(false);
   }
 
+  const isImage = viewMimeType.startsWith("image/");
+  const isPdf = viewMimeType === "application/pdf";
+  const isAudio = viewMimeType.startsWith("audio/");
+  const isVideo = viewMimeType.startsWith("video/");
+
   return (
     <div style={{ marginBottom: 8 }}>
       <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 8 }}>
@@ -129,24 +135,31 @@ function SubmissionUploader(props: {
         </button>
       </div>
       {msg && <span style={{ fontSize: 13, color: "#666" }}>{msg}</span>}
-      {viewUrl && props.kind === "photo" && viewMimeType === "application/pdf" && (
+      {viewUrl && isPdf && (
         <div style={{ marginTop: 6 }}>
-          <iframe src={viewUrl} title={viewFilename || "제출 PDF"} style={{ width: "100%", height: 400, border: "1px solid #ddd", borderRadius: 8 }} />
+          <iframe src={viewUrl} title={viewFilename || "제출 파일"} style={{ width: "100%", height: 400, border: "1px solid #ddd", borderRadius: 8 }} />
         </div>
       )}
-      {viewUrl && props.kind === "photo" && viewMimeType !== "application/pdf" && (
+      {viewUrl && isImage && (
         <div style={{ marginTop: 6 }}>
           <img src={viewUrl} alt="제출 사진" style={{ maxWidth: "100%", borderRadius: 8 }} />
         </div>
       )}
-      {viewUrl && props.kind === "audio" && (
+      {viewUrl && isAudio && (
         <div style={{ marginTop: 6 }}>
           <audio controls src={viewUrl} style={{ width: "100%" }} />
         </div>
       )}
-      {viewUrl && props.kind === "video" && (
+      {viewUrl && isVideo && (
         <div style={{ marginTop: 6 }}>
           <video controls src={viewUrl} style={{ width: "100%", maxHeight: 320, borderRadius: 8 }} />
+        </div>
+      )}
+      {viewUrl && !isPdf && !isImage && !isAudio && !isVideo && (
+        <div style={{ marginTop: 6 }}>
+          <a href={viewUrl} target="_blank" rel="noreferrer" style={{ fontSize: 13 }}>
+            📎 {viewFilename || "제출 파일 열기/다운로드"}
+          </a>
         </div>
       )}
     </div>
@@ -376,6 +389,15 @@ export default function StudentPage() {
                     kind="video"
                     accept="video/*"
                     label="🎬 영상 올리기"
+                    onDone={loadToday}
+                  />
+                )}
+                {item.hasFileSubmission && (
+                  <SubmissionUploader
+                    assignedItemId={item.assignedItemId}
+                    kind="file"
+                    accept="*/*"
+                    label="📎 파일 올리기"
                     onDone={loadToday}
                   />
                 )}
