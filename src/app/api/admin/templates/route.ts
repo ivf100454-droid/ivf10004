@@ -19,9 +19,8 @@ export async function GET(req: NextRequest) {
  * templates/[id]/route.ts와의 하위 호환을 위해 스키마상으로는 남아있지만,
  * 이 엔드포인트는 activityIds 방식만 받는다.
  *
- * 참고: Activity.hasFileSubmission(파일 제출)은 TemplateItem에 별도 필드가
- * 없어 hasPhotoSubmission 칸에 합쳐서 저장한다(사진 제출 칸이 PDF도 이미
- * 받을 수 있음). 완전히 분리된 "파일 제출" 칸은 다음 배치 과제로 남긴다.
+ * 파일 제출(hasFileSubmission)은 이제 TemplateItem에 별도 칸이 있어
+ * 사진 제출과 더 이상 합쳐지지 않는다.
  */
 export async function POST(req: NextRequest) {
   const admin = await getAdminFromRequest(req);
@@ -52,9 +51,10 @@ export async function POST(req: NextRequest) {
           if (a.hasCheck) required.push("check");
           if (a.hasCount) required.push("count");
           if (a.hasScore) required.push("score");
-          if (a.hasPhotoSubmission || a.hasFileSubmission) required.push("photoSubmission");
+          if (a.hasPhotoSubmission) required.push("photoSubmission");
           if (a.hasAudioSubmission) required.push("audioSubmission");
           if (a.hasVideoSubmission) required.push("videoSubmission");
+          if (a.hasFileSubmission) required.push("fileSubmission");
 
           return {
             activityId: a.activityId,
@@ -67,9 +67,10 @@ export async function POST(req: NextRequest) {
             maxScore: a.maxScore,
             linkUrl: a.materialLinkUrl,
             teachingVideoId: a.materialVideoId,
-            hasPhotoSubmission: a.hasPhotoSubmission || a.hasFileSubmission,
+            hasPhotoSubmission: a.hasPhotoSubmission,
             hasAudioSubmission: a.hasAudioSubmission,
             hasVideoSubmission: a.hasVideoSubmission,
+            hasFileSubmission: a.hasFileSubmission,
             requiredFeatures: required,
           };
         }),
