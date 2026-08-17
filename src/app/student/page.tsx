@@ -38,6 +38,121 @@ function scoreOptions(maxScore: number) {
   return opts;
 }
 
+function SubmissionUploader(props: {
+  assignedItemId: string;
+  kind: "photo" | "audio" | "video";
+  accept: string;
+  label: string;
+  onDone: () => void;
+}) {
+  const [uploading, setUploading] = useState(false);
+  const [msg, setMsg] = useState("");
+  const [viewUrl, setViewUrl] = useState("");
+  const [viewMimeType, setViewMimeType] = useState("");
+  const [viewFilename, setViewFilename] = useState("");
+
+  async function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files && e.target.files[0];
+    if (!file) return;
+    setUploading(true);
+    setMsg("");
+    const formData = new FormData();
+    formData.append("file", file);
+    const res = await fetch(`/api/student/assigned-items/${props.assignedItemId}/${props.kind}`, {
+      method: "POST",
+      body: formData,
+    });
+    const data = await res.json().catch(() => ({}));
+    if (res.ok) {
+      setMsg("업로드 완료");
+      props.onDone();
+    } else {
+      setMsg("실패: " + data.error);
+    }
+    setUploading(false);
+  }
+
+  async function handleView() {
+    const res = await fetch(`/api/student/assigned-items/${props.assignedItemId}/${props.kind}`);
+    if (res.ok) {
+      const data = await res.json();
+      setViewUrl(data.url);
+      setViewMimeType(data.mimeType || "");
+      setViewFilename(data.filename || "");
+    } else {
+      setMsg("아직 제출된 파일이 없습니다.");
+    }
+  }
+
+  async function handleDelete() {
+    if (!confirm("업로드된 파일을 삭제하시겠어요?")) return;
+    setUploading(true);
+    setMsg("");
+    const res = await fetch(`/api/student/assigned-items/${props.assignedItemId}/${props.kind}`, {
+      method: "DELETE",
+    });
+    const data = await res.json().catch(() => ({}));
+    if (res.ok) {
+      setMsg("삭제 완료");
+      setViewUrl("");
+      setViewMimeType("");
+      setViewFilename("");
+      props.onDone();
+    } else {
+      setMsg("삭제 실패: " + data.error);
+    }
+    setUploading(false);
+  }
+
+  return (
+    <div style={{ marginBottom: 8 }}>
+      <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 8 }}>
+        <label
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            padding: "8px 14px",
+            fontSize: 14,
+            border: "1px solid #ccc",
+            borderRadius: 8,
+            cursor: "pointer",
+          }}
+        >
+          {uploading ? "업로드 중..." : props.label}
+          <input type="file" accept={props.accept} onChange={handleFile} disabled={uploading} style={{ display: "none" }} />
+        </label>
+        <button type="button" onClick={handleView} style={{ padding: "8px 12px", fontSize: 13 }}>
+          파일 보기
+        </button>
+        <button type="button" onClick={handleDelete} disabled={uploading} style={{ padding: "8px 12px", fontSize: 13, color: "#c0392b" }}>
+          삭제
+        </button>
+      </div>
+      {msg && <span style={{ fontSize: 13, color: "#666" }}>{msg}</span>}
+      {viewUrl && props.kind === "photo" && viewMimeType === "application/pdf" && (
+        <div style={{ marginTop: 6 }}>
+          <iframe src={viewUrl} title={viewFilename || "제출 PDF"} style={{ width: "100%", height: 400, border: "1px solid #ddd", borderRadius: 8 }} />
+        </div>
+      )}
+      {viewUrl && props.kind === "photo" && viewMimeType !== "application/pdf" && (
+        <div style={{ marginTop: 6 }}>
+          <img src={viewUrl} alt="제출 사진" style={{ maxWidth: "100%", borderRadius: 8 }} />
+        </div>
+      )}
+      {viewUrl && props.kind === "audio" && (
+        <div style={{ marginTop: 6 }}>
+          <audio controls src={viewUrl} style={{ width: "100%" }} />
+        </div>
+      )}
+      {viewUrl && props.kind === "video" && (
+        <div style={{ marginTop: 6 }}>
+          <video controls src={viewUrl} style={{ width: "100%", maxHeight: 320, borderRadius: 8 }} />
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function StudentPage() {
   const [loggedIn, setLoggedIn] = useState(false);
   const [loginId, setLoginId] = useState("");
@@ -237,10 +352,32 @@ export default function StudentPage() {
                   </div>
                 )}
 
-                {(item.hasPhotoSubmission || item.hasAudioSubmission || item.hasVideoSubmission) && (
-                  <p style={{ fontSize: 12, color: "#aaa", marginTop: 4 }}>
-                    사진/음성/영상 제출은 준비 중이에요 — 완료되면 여기서 바로 올릴 수 있게 됩니다.
-                  </p>
+                {item.hasPhotoSubmission && (
+                  <SubmissionUploader
+                    assignedItemId={item.assignedItemId}
+                    kind="photo"
+                    accept="image/*,application/pdf"
+                    label="📷 사진 올리기"
+                    onDone={loadToday}
+                  />
+                )}
+                {item.hasAudioSubmission && (
+                  <SubmissionUploader
+                    assignedItemId={item.assignedItemId}
+                    kind="audio"
+                    accept="audio/*"
+                    label="🎤 음성 올리기"
+                    onDone={loadToday}
+                  />
+                )}
+                {item.hasVideoSubmission && (
+                  <SubmissionUploader
+                    assignedItemId={item.assignedItemId}
+                    kind="video"
+                    accept="video/*"
+                    label="🎬 영상 올리기"
+                    onDone={loadToday}
+                  />
                 )}
               </div>
             ))
