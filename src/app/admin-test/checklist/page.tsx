@@ -1,702 +1,187 @@
-"use client";
+import { NextRequest, NextResponse } from "next/server";
+import { randomUUID } from "crypto";
+import { prisma } from "@/lib/db";
+import { getAdminFromRequest } from "@/lib/adminAuth";
+import { isAcademyToday } from "@/lib/timezone";
+import { uploadToR2, getSignedDownloadUrl } from "@/lib/storage";
 
-import { useEffect, useState } from "react";
+const MAX_FILE_SIZE = 50 * 1024 * 1024;
 
-type Student = { studentId: string; name: string };
-type Template = { templateId: string; name: string; items: { templateItemId: string }[] };
-
-type AssignedItem = {
-  assignedItemId: string;
-  title: string;
-  hasCheck: boolean;
-  checked: boolean;
-  hasCount: boolean;
-  currentCount: number;
-  targetCount: number | null;
-  hasScore: boolean;
-  score: number | null;
-  maxScore: number | null;
-  linkUrl: string | null;
-  linkLabel: string | null;
-  hasPhotoSubmission: boolean;
-  hasAudioSubmission: boolean;
-  hasVideoSubmission: boolean;
-  completed: boolean;
-  teachingVideo: { title: string; url: string } | null;
-};
-type Assignment = { assignmentId: string; items: AssignedItem[] };
-type TodayData = { assignments: Assignment[]; progress: number };
-
-function PhotoUploader(props: { assignedItemId: string; onDone: () => void }) {
-  const [uploading, setUploading] = useState(false);
-  const [msg, setMsg] = useState("");
-  const [viewUrl, setViewUrl] = useState("");
-  const [viewMimeType, setViewMimeType] = useState("");
-  const [viewFilename, setViewFilename] = useState("");
-
-  async function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files && e.target.files[0];
-    if (!file) return;
-    setUploading(true);
-    setMsg("");
-    const formData = new FormData();
-    formData.append("file", file);
-    const res = await fetch("/api/admin/assigned-items/" + props.assignedItemId + "/photo", {
-      method: "POST",
-      body: formData,
-    });
-    const data = await res.json().catch(function () {
-      return {};
-    });
-    if (res.ok) {
-      setMsg("업로드 완료");
-      props.onDone();
-    } else {
-      setMsg("실패: " + data.error);
-    }
-    setUploading(false);
-  }
-
-  async function handleView() {
-    const res = await fetch("/api/admin/assigned-items/" + props.assignedItemId + "/photo");
-    if (res.ok) {
-      const data = await res.json();
-      setViewUrl(data.url);
-      setViewMimeType(data.mimeType || "");
-      setViewFilename(data.filename || "");
-    } else {
-      setMsg("아직 제출된 파일이 없습니다.");
-    }
-  }
-
-  async function handleDelete() {
-    if (!window.confirm("업로드된 파일을 삭제하시겠어요?")) return;
-    setUploading(true);
-    setMsg("");
-    const res = await fetch("/api/admin/assigned-items/" + props.assignedItemId + "/photo", {
-      method: "DELETE",
-    });
-    const data = await res.json().catch(function () {
-      return {};
-    });
-    if (res.ok) {
-      setMsg("삭제 완료");
-      setViewUrl("");
-      setViewMimeType("");
-      setViewFilename("");
-      props.onDone();
-    } else {
-      setMsg("삭제 실패: " + data.error);
-    }
-    setUploading(false);
-  }
-
-  return (
-    <div style={{ marginBottom: 6 }}>
-      <input type="file" accept="image/*,application/pdf" onChange={handleFile} disabled={uploading} />
-      <button type="button" onClick={handleView} style={{ marginLeft: 8, padding: "4px 10px" }}>
-        파일 보기
-      </button>
-      <button type="button" onClick={handleDelete} disabled={uploading} style={{ marginLeft: 8, padding: "4px 10px", color: "#c0392b" }}>
-        삭제
-      </button>
-      {msg && <span style={{ marginLeft: 8, fontSize: 13 }}>{msg}</span>}
-      {viewUrl && viewMimeType === "application/pdf" && (
-        <div style={{ marginTop: 6 }}>
-          <iframe
-            src={viewUrl}
-            title={viewFilename || "제출 PDF"}
-            style={{ width: "100%", height: 500, border: "1px solid #ddd", borderRadius: 8 }}
-          />
-          <div style={{ marginTop: 4 }}>
-            <a href={viewUrl} target="_blank" rel="noreferrer" style={{ fontSize: 13 }}>
-              📄 {viewFilename || "새 창에서 크게 보기"}
-            </a>
-          </div>
-        </div>
-      )}
-      {viewUrl && viewMimeType !== "application/pdf" && (
-        <div style={{ marginTop: 6 }}>
-          <img src={viewUrl} alt="제출 사진" style={{ maxWidth: "100%", borderRadius: 8 }} />
-        </div>
-      )}
-    </div>
-  );
+function evaluateCompleted(
+  required: string[],
+  checked: boolean,
+  currentCount: number,
+  targetCount: number | null,
+  score: number | null,
+  justSubmittedFile: boolean
+) {
+  if (required.length === 0) return checked === true;
+  return required.every(function (feature) {
+    if (feature === "check") return checked === true;
+    if (feature === "count") return targetCount != null && currentCount >= targetCount;
+    if (feature === "score") return score !== null && score !== undefined;
+    if (feature === "photoSubmission") return false;
+    if (feature === "audioSubmission") return false;
+    if (feature === "videoSubmission") return false;
+    if (feature === "fileSubmission") return justSubmittedFile;
+    return false;
+  });
 }
 
-function AudioUploader(props: { assignedItemId: string; onDone: () => void }) {
-  const [uploading, setUploading] = useState(false);
-  const [msg, setMsg] = useState("");
-  const [viewUrl, setViewUrl] = useState("");
-  const [viewFilename, setViewFilename] = useState("");
+export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
+  const admin = await getAdminFromRequest(req);
+  if (!admin) return NextResponse.json({ error: "관리자 로그인이 필요합니다." }, { status: 401 });
 
-  async function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files && e.target.files[0];
-    if (!file) return;
-    setUploading(true);
-    setMsg("");
-    const formData = new FormData();
-    formData.append("file", file);
-    const res = await fetch("/api/admin/assigned-items/" + props.assignedItemId + "/audio", {
-      method: "POST",
-      body: formData,
-    });
-    const data = await res.json().catch(function () {
-      return {};
-    });
-    if (res.ok) {
-      setMsg("업로드 완료");
-      props.onDone();
-    } else {
-      setMsg("실패: " + data.error);
-    }
-    setUploading(false);
+  const item = await prisma.assignedChecklistItem.findUnique({
+    where: { assignedItemId: params.id },
+    include: { assignment: true },
+  });
+  if (!item) return NextResponse.json({ error: "존재하지 않는 항목입니다." }, { status: 404 });
+  if (!item.hasFileSubmission) {
+    return NextResponse.json({ error: "이 항목은 파일 제출 기능이 꺼져 있습니다." }, { status: 400 });
+  }
+  if (!isAcademyToday(item.assignment.checklistDate)) {
+    return NextResponse.json({ error: "과거 날짜의 항목은 수정할 수 없습니다." }, { status: 403 });
   }
 
-  async function handleView() {
-    const res = await fetch("/api/admin/assigned-items/" + props.assignedItemId + "/audio");
-    if (res.ok) {
-      const data = await res.json();
-      setViewUrl(data.url);
-      setViewFilename(data.filename || "");
-    } else {
-      setMsg("아직 제출된 파일이 없습니다.");
-    }
+  const formData = await req.formData().catch(function () {
+    return null;
+  });
+  const file = formData ? formData.get("file") : null;
+  if (!file || !(file instanceof File)) {
+    return NextResponse.json({ error: "file 필드가 필요합니다." }, { status: 400 });
+  }
+  if (file.size > MAX_FILE_SIZE) {
+    return NextResponse.json({ error: "파일이 너무 큽니다 (최대 50MB)." }, { status: 400 });
   }
 
-  async function handleDelete() {
-    if (!window.confirm("업로드된 음성 파일을 삭제하시겠어요?")) return;
-    setUploading(true);
-    setMsg("");
-    const res = await fetch("/api/admin/assigned-items/" + props.assignedItemId + "/audio", {
-      method: "DELETE",
-    });
-    const data = await res.json().catch(function () {
-      return {};
-    });
-    if (res.ok) {
-      setMsg("삭제 완료");
-      setViewUrl("");
-      setViewFilename("");
-      props.onDone();
-    } else {
-      setMsg("삭제 실패: " + data.error);
-    }
-    setUploading(false);
-  }
+  const arrayBuffer = await file.arrayBuffer();
+  const buffer = Buffer.from(arrayBuffer);
+  const fileId = randomUUID();
+  const storageKey = "files/" + item.assignedItemId + "/" + fileId;
 
-  return (
-    <div style={{ marginBottom: 6 }}>
-      <input type="file" accept="audio/*" onChange={handleFile} disabled={uploading} />
-      <button type="button" onClick={handleView} style={{ marginLeft: 8, padding: "4px 10px" }}>
-        파일 보기
-      </button>
-      <button type="button" onClick={handleDelete} disabled={uploading} style={{ marginLeft: 8, padding: "4px 10px", color: "#c0392b" }}>
-        삭제
-      </button>
-      {msg && <span style={{ marginLeft: 8, fontSize: 13 }}>{msg}</span>}
-      {viewUrl && (
-        <div style={{ marginTop: 6 }}>
-          <audio controls src={viewUrl} style={{ width: "100%" }} />
-          {viewFilename && <div style={{ fontSize: 12, color: "#888", marginTop: 2 }}>{viewFilename}</div>}
-        </div>
-      )}
-    </div>
+  await uploadToR2(storageKey, buffer, file.type || "application/octet-stream");
+
+  const required: string[] = Array.isArray(item.requiredFeatures)
+    ? (item.requiredFeatures as string[])
+    : [];
+  const completed = evaluateCompleted(
+    required,
+    item.checked,
+    item.currentCount,
+    item.targetCount,
+    item.score,
+    true
   );
+
+  const submissionId = await prisma.$transaction(async function (tx) {
+    const fileMeta = await tx.fileMetadata.create({
+      data: {
+        fileId: fileId,
+        storageKey: storageKey,
+        originalFilename: file.name || "file",
+        mimeType: file.type || "application/octet-stream",
+        sizeBytes: file.size,
+        uploadedBy: admin.adminId,
+      },
+    });
+
+    await tx.fileSubmission.updateMany({
+      where: { assignedItemId: item.assignedItemId, status: "current" },
+      data: { status: "superseded" },
+    });
+
+    const submission = await tx.fileSubmission.create({
+      data: {
+        assignedItemId: item.assignedItemId,
+        studentId: item.assignment.studentId,
+        fileId: fileMeta.fileId,
+        status: "current",
+      },
+    });
+
+    await tx.assignedChecklistItem.update({
+      where: { assignedItemId: item.assignedItemId },
+      data: {
+        completed: completed,
+        completedAt: completed ? new Date() : null,
+      },
+    });
+
+    return submission.submissionId;
+  });
+
+  return NextResponse.json({ ok: true, submissionId: submissionId }, { status: 201 });
 }
 
-function VideoUploader(props: { assignedItemId: string; onDone: () => void }) {
-  const [uploading, setUploading] = useState(false);
-  const [msg, setMsg] = useState("");
-  const [viewUrl, setViewUrl] = useState("");
-  const [viewFilename, setViewFilename] = useState("");
+export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
+  const admin = await getAdminFromRequest(req);
+  if (!admin) return NextResponse.json({ error: "관리자 로그인이 필요합니다." }, { status: 401 });
 
-  async function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files && e.target.files[0];
-    if (!file) return;
-    setUploading(true);
-    setMsg("");
-    const formData = new FormData();
-    formData.append("file", file);
-    const res = await fetch("/api/admin/assigned-items/" + props.assignedItemId + "/video", {
-      method: "POST",
-      body: formData,
-    });
-    const data = await res.json().catch(function () {
-      return {};
-    });
-    if (res.ok) {
-      setMsg("업로드 완료");
-      props.onDone();
-    } else {
-      setMsg("실패: " + data.error);
-    }
-    setUploading(false);
+  const submission = await prisma.fileSubmission.findFirst({
+    where: { assignedItemId: params.id, status: "current" },
+    include: { file: true },
+    orderBy: { submittedAt: "desc" },
+  });
+  if (!submission) {
+    return NextResponse.json({ error: "제출된 파일이 없습니다." }, { status: 404 });
   }
 
-  async function handleView() {
-    const res = await fetch("/api/admin/assigned-items/" + props.assignedItemId + "/video");
-    if (res.ok) {
-      const data = await res.json();
-      setViewUrl(data.url);
-      setViewFilename(data.filename || "");
-    } else {
-      setMsg("아직 제출된 파일이 없습니다.");
-    }
-  }
-
-  async function handleDelete() {
-    if (!window.confirm("업로드된 영상 파일을 삭제하시겠어요?")) return;
-    setUploading(true);
-    setMsg("");
-    const res = await fetch("/api/admin/assigned-items/" + props.assignedItemId + "/video", {
-      method: "DELETE",
-    });
-    const data = await res.json().catch(function () {
-      return {};
-    });
-    if (res.ok) {
-      setMsg("삭제 완료");
-      setViewUrl("");
-      setViewFilename("");
-      props.onDone();
-    } else {
-      setMsg("삭제 실패: " + data.error);
-    }
-    setUploading(false);
-  }
-
-  return (
-    <div style={{ marginBottom: 6 }}>
-      <input type="file" accept="video/*" onChange={handleFile} disabled={uploading} />
-      <button type="button" onClick={handleView} style={{ marginLeft: 8, padding: "4px 10px" }}>
-        파일 보기
-      </button>
-      <button type="button" onClick={handleDelete} disabled={uploading} style={{ marginLeft: 8, padding: "4px 10px", color: "#c0392b" }}>
-        삭제
-      </button>
-      {msg && <span style={{ marginLeft: 8, fontSize: 13 }}>{msg}</span>}
-      {viewUrl && (
-        <div style={{ marginTop: 6 }}>
-          <video controls src={viewUrl} style={{ width: "100%", maxHeight: 400, borderRadius: 8 }} />
-          {viewFilename && <div style={{ fontSize: 12, color: "#888", marginTop: 2 }}>{viewFilename}</div>}
-        </div>
-      )}
-    </div>
-  );
+  const url = await getSignedDownloadUrl(submission.file.storageKey, 300);
+  return NextResponse.json({
+    url: url,
+    submittedAt: submission.submittedAt,
+    mimeType: submission.file.mimeType,
+    filename: submission.file.originalFilename,
+  });
 }
 
-export default function ChecklistTestPage() {
-  const [loggedIn, setLoggedIn] = useState(false);
-  const [loginId, setLoginId] = useState("");
-  const [password, setPassword] = useState("");
-  const [loginMsg, setLoginMsg] = useState("");
+export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
+  const admin = await getAdminFromRequest(req);
+  if (!admin) return NextResponse.json({ error: "관리자 로그인이 필요합니다." }, { status: 401 });
 
-  const [students, setStudents] = useState<Student[]>([]);
-  const [templates, setTemplates] = useState<Template[]>([]);
-
-  const [selectedStudentId, setSelectedStudentId] = useState("");
-  const [selectedTemplateId, setSelectedTemplateId] = useState("");
-  const [assignMsg, setAssignMsg] = useState("");
-
-  const [viewStudentId, setViewStudentId] = useState("");
-  const [todayData, setTodayData] = useState<TodayData | null>(null);
-  const [shareLinkUrl, setShareLinkUrl] = useState("");
-  const [shareLinkMsg, setShareLinkMsg] = useState("");
-
-  async function refreshBase() {
-    const sRes = await fetch("/api/admin/students");
-    const tRes = await fetch("/api/admin/templates");
-    if (sRes.status === 401) {
-      setLoggedIn(false);
-      return;
-    }
-    setLoggedIn(true);
-    setStudents(await sRes.json());
-    setTemplates(await tRes.json());
+  const item = await prisma.assignedChecklistItem.findUnique({
+    where: { assignedItemId: params.id },
+    include: { assignment: true },
+  });
+  if (!item) return NextResponse.json({ error: "존재하지 않는 항목입니다." }, { status: 404 });
+  if (!isAcademyToday(item.assignment.checklistDate)) {
+    return NextResponse.json({ error: "과거 날짜의 항목은 수정할 수 없습니다." }, { status: 403 });
   }
 
-  useEffect(() => {
-    refreshBase();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  async function loadToday(studentId: string) {
-    if (!studentId) {
-      setTodayData(null);
-      return;
-    }
-    const res = await fetch("/api/admin/students/" + studentId + "/today");
-    if (res.ok) {
-      const data = await res.json();
-      setTodayData(data);
-    }
+  const submission = await prisma.fileSubmission.findFirst({
+    where: { assignedItemId: item.assignedItemId, status: "current" },
+    orderBy: { submittedAt: "desc" },
+  });
+  if (!submission) {
+    return NextResponse.json({ error: "삭제할 파일이 없습니다." }, { status: 404 });
   }
 
-  useEffect(() => {
-    if (viewStudentId) loadToday(viewStudentId);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [viewStudentId]);
-
-  async function handleLogin(e: React.FormEvent) {
-    e.preventDefault();
-    setLoginMsg("로그인 중...");
-    const res = await fetch("/api/admin/auth/login", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ loginId: loginId, password: password }),
-    });
-    if (res.ok) {
-      setLoginMsg("");
-      await refreshBase();
-    } else {
-      const data = await res.json().catch(() => ({}));
-      setLoginMsg(data.error || "로그인 실패");
-    }
-  }
-
-  async function handleAssign(e: React.FormEvent) {
-    e.preventDefault();
-    setAssignMsg("");
-    if (!selectedStudentId || !selectedTemplateId) {
-      setAssignMsg("학생과 템플릿을 모두 선택해주세요.");
-      return;
-    }
-    const res = await fetch("/api/admin/assignments", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ studentId: selectedStudentId, templateId: selectedTemplateId }),
-    });
-    const data = await res.json().catch(() => ({}));
-    if (res.ok) {
-      setAssignMsg("배정 완료 (항목 " + data.items.length + "개)");
-      if (viewStudentId === selectedStudentId) {
-        await loadToday(selectedStudentId);
-      }
-    } else {
-      setAssignMsg("실패: " + data.error);
-    }
-  }
-
-  async function patchItem(assignedItemId: string, patch: Record<string, unknown>) {
-    await fetch("/api/admin/assigned-items/" + assignedItemId, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(patch),
-    });
-    await loadToday(viewStudentId);
-  }
-
-  async function resetItem(item: AssignedItem) {
-    if (!window.confirm("\"" + item.title + "\" 항목을 초기화하시겠어요? 체크/횟수/점수/제출 파일이 모두 지워집니다.")) return;
-    const patch: Record<string, unknown> = {};
-    if (item.hasCheck) patch.checked = false;
-    if (item.hasCount) patch.currentCount = 0;
-    if (item.hasScore) patch.score = null;
-    if (Object.keys(patch).length > 0) {
-      await patchItem(item.assignedItemId, patch);
-    }
-    if (item.hasPhotoSubmission) {
-      await fetch("/api/admin/assigned-items/" + item.assignedItemId + "/photo", {
-        method: "DELETE",
-      }).catch(function () {});
-    }
-    if (item.hasAudioSubmission) {
-      await fetch("/api/admin/assigned-items/" + item.assignedItemId + "/audio", {
-        method: "DELETE",
-      }).catch(function () {});
-    }
-    if (item.hasVideoSubmission) {
-      await fetch("/api/admin/assigned-items/" + item.assignedItemId + "/video", {
-        method: "DELETE",
-      }).catch(function () {});
-    }
-    await loadToday(viewStudentId);
-  }
-
-  async function handleDeleteAssignment(assignmentId: string) {
-    if (!window.confirm("이 배정을 통째로 삭제하시겠어요? 안의 모든 항목과 제출 기록이 함께 삭제됩니다.")) return;
-    const res = await fetch("/api/admin/assignments/" + assignmentId, { method: "DELETE" });
-    const data = await res.json().catch(function () {
-      return {};
-    });
-    if (res.ok) {
-      await loadToday(viewStudentId);
-    } else {
-      alert("삭제 실패: " + data.error);
-    }
-  }
-
-  async function handleCreateShareLink() {
-    if (!viewStudentId) {
-      setShareLinkMsg("학생을 먼저 선택해주세요.");
-      return;
-    }
-    setShareLinkMsg("링크 생성 중...");
-    setShareLinkUrl("");
-    const res = await fetch("/api/admin/students/" + viewStudentId + "/share-link", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({}),
-    });
-    const data = await res.json().catch(function () {
-      return {};
-    });
-    if (res.ok) {
-      const url = window.location.origin + "/share/" + data.token;
-      setShareLinkUrl(url);
-      setShareLinkMsg("링크가 생성되었습니다 (30일간 유효). 아래 주소를 복사해서 학부모님께 전달하세요.");
-    } else {
-      setShareLinkMsg("실패: " + data.error);
-    }
-  }
-
-  const box: React.CSSProperties = {
-    padding: 10,
-    fontSize: 16,
-    width: "100%",
-    boxSizing: "border-box",
-  };
-
-  if (!loggedIn) {
-    return (
-      <div style={{ maxWidth: 420, margin: "40px auto", padding: 16, fontFamily: "sans-serif" }}>
-        <h1 style={{ fontSize: 20, marginBottom: 16 }}>관리자 로그인</h1>
-        <form onSubmit={handleLogin} style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-          <input
-            placeholder="아이디"
-            value={loginId}
-            onChange={(e) => setLoginId(e.target.value)}
-            style={box}
-          />
-          <input
-            placeholder="비밀번호"
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            style={box}
-          />
-          <button type="submit" style={{ padding: 12, fontSize: 16 }}>
-            로그인
-          </button>
-        </form>
-        {loginMsg && <p style={{ color: "crimson" }}>{loginMsg}</p>}
-      </div>
-    );
-  }
-
-  return (
-    <div style={{ maxWidth: 560, margin: "40px auto", padding: 16, fontFamily: "sans-serif" }}>
-      <h1 style={{ fontSize: 20, marginBottom: 16 }}>체크리스트 배정 / 오늘 확인</h1>
-
-      <h2 style={{ fontSize: 16, marginBottom: 8 }}>1. 학생에게 배정</h2>
-      <form onSubmit={handleAssign} style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-        <select
-          value={selectedStudentId}
-          onChange={(e) => setSelectedStudentId(e.target.value)}
-          style={box}
-        >
-          <option value="">학생 선택</option>
-          {students.map((s) => (
-            <option key={s.studentId} value={s.studentId}>
-              {s.name}
-            </option>
-          ))}
-        </select>
-        <select
-          value={selectedTemplateId}
-          onChange={(e) => setSelectedTemplateId(e.target.value)}
-          style={box}
-        >
-          <option value="">템플릿 선택</option>
-          {templates.map((t) => (
-            <option key={t.templateId} value={t.templateId}>
-              {t.name} ({t.items.length}개 항목)
-            </option>
-          ))}
-        </select>
-        <button type="submit" style={{ padding: 12, fontSize: 16 }}>
-          오늘 날짜로 배정
-        </button>
-      </form>
-      {assignMsg && <p style={{ fontSize: 14 }}>{assignMsg}</p>}
-
-      <h2 style={{ fontSize: 16, marginTop: 28, marginBottom: 8 }}>2. 오늘 체크리스트 보기</h2>
-      <select value={viewStudentId} onChange={(e) => setViewStudentId(e.target.value)} style={box}>
-        <option value="">학생 선택</option>
-        {students.map((s) => (
-          <option key={s.studentId} value={s.studentId}>
-            {s.name}
-          </option>
-        ))}
-      </select>
-
-      <button
-        type="button"
-        onClick={handleCreateShareLink}
-        style={{ marginTop: 8, padding: "8px 12px", fontSize: 14 }}
-      >
-        학부모 공유링크 만들기 (오늘 날짜)
-      </button>
-      {shareLinkMsg && <p style={{ fontSize: 13, marginTop: 6 }}>{shareLinkMsg}</p>}
-      {shareLinkUrl && (
-        <input
-          readOnly
-          value={shareLinkUrl}
-          onFocus={(e) => e.target.select()}
-          style={{ ...box, marginTop: 6, fontSize: 13 }}
-        />
-      )}
-
-      {todayData && (
-        <div style={{ marginTop: 16 }}>
-          <div
-            style={{
-              background: "#eee",
-              borderRadius: 8,
-              overflow: "hidden",
-              height: 20,
-              marginBottom: 8,
-            }}
-          >
-            <div
-              style={{
-                width: todayData.progress + "%",
-                background: "#4caf50",
-                height: "100%",
-              }}
-            />
-          </div>
-          <p style={{ fontSize: 14, marginBottom: 16 }}>진행률 {todayData.progress}%</p>
-
-          {todayData.assignments.length === 0 && (
-            <p style={{ color: "#888" }}>오늘 배정된 체크리스트가 없습니다.</p>
-          )}
-
-          {todayData.assignments.map((a) => (
-            <div key={a.assignmentId} style={{ marginBottom: 20 }}>
-              <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 6 }}>
-                <button
-                  type="button"
-                  onClick={() => handleDeleteAssignment(a.assignmentId)}
-                  style={{ fontSize: 12, padding: "3px 8px", color: "#c0392b", background: "none", border: "1px solid #c0392b", borderRadius: 4 }}
-                >
-                  이 배정 전체 삭제
-                </button>
-              </div>
-              {a.items.map((item) => (
-                <div
-                  key={item.assignedItemId}
-                  style={{
-                    border: "1px solid #eee",
-                    borderRadius: 8,
-                    padding: 12,
-                    marginBottom: 10,
-                    background: item.completed ? "#f3fbf3" : "white",
-                  }}
-                >
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-                    <div style={{ fontSize: 16, fontWeight: 600 }}>
-                      {item.completed ? "✅ " : "⬜ "}
-                      {item.title}
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => resetItem(item)}
-                      style={{ fontSize: 12, padding: "3px 8px", color: "#c0392b", background: "none", border: "1px solid #c0392b", borderRadius: 4 }}
-                    >
-                      초기화
-                    </button>
-                  </div>
-
-                  {item.hasCheck && (
-                    <label style={{ display: "block", marginBottom: 6 }}>
-                      <input
-                        type="checkbox"
-                        checked={item.checked}
-                        onChange={(e) =>
-                          patchItem(item.assignedItemId, { checked: e.target.checked })
-                        }
-                        style={{ width: 20, height: 20, marginRight: 8 }}
-                      />
-                      체크 완료
-                    </label>
-                  )}
-
-                  {item.hasCount && (
-                    <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
-                      <button
-                        type="button"
-                        onClick={() =>
-                          patchItem(item.assignedItemId, {
-                            currentCount: item.currentCount - 1,
-                          })
-                        }
-                        disabled={item.currentCount <= 0}
-                        style={{ padding: "4px 12px" }}
-                      >
-                        -
-                      </button>
-                      <span>
-                        {item.currentCount} / {item.targetCount}회
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() =>
-                          patchItem(item.assignedItemId, {
-                            currentCount: item.currentCount + 1,
-                          })
-                        }
-                        style={{ padding: "4px 12px" }}
-                      >
-                        +
-                      </button>
-                    </div>
-                  )}
-
-                  {item.hasScore && (
-                    <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
-                      <input
-                        type="number"
-                        placeholder="점수"
-                        defaultValue={item.score ?? ""}
-                        onBlur={(e) =>
-                          patchItem(item.assignedItemId, {
-                            score: e.target.value === "" ? null : Number(e.target.value),
-                          })
-                        }
-                        style={{ width: 80, padding: 6 }}
-                      />
-                      <span>/ {item.maxScore}점</span>
-                    </div>
-                  )}
-
-                  {item.linkUrl && (
-                    <a href={item.linkUrl} target="_blank" rel="noreferrer" style={{ display: "inline-block", marginBottom: 6 }}>
-                      🔗 {item.linkLabel || "자료 열기"}
-                    </a>
-                  )}
-
-                  {item.teachingVideo && (
-                    <div style={{ marginBottom: 8 }}>
-                      <div style={{ fontSize: 13, color: "#555", marginBottom: 4 }}>
-                        🎓 학습영상: {item.teachingVideo.title}
-                      </div>
-                      <video controls src={item.teachingVideo.url} style={{ width: "100%", maxHeight: 360, borderRadius: 8 }} />
-                    </div>
-                  )}
-
-                  {item.hasPhotoSubmission && <PhotoUploader assignedItemId={item.assignedItemId} onDone={function () { loadToday(viewStudentId); }} />}
-
-                  {item.hasAudioSubmission && <AudioUploader assignedItemId={item.assignedItemId} onDone={function () { loadToday(viewStudentId); }} />}
-
-                  {item.hasVideoSubmission && <VideoUploader assignedItemId={item.assignedItemId} onDone={function () { loadToday(viewStudentId); }} />}
-                </div>
-              ))}
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
+  const required: string[] = Array.isArray(item.requiredFeatures)
+    ? (item.requiredFeatures as string[])
+    : [];
+  const completed = evaluateCompleted(
+    required,
+    item.checked,
+    item.currentCount,
+    item.targetCount,
+    item.score,
+    false
   );
+
+  await prisma.$transaction(async function (tx) {
+    await tx.fileSubmission.update({
+      where: { submissionId: submission.submissionId },
+      data: { status: "superseded" },
+    });
+    await tx.assignedChecklistItem.update({
+      where: { assignedItemId: item.assignedItemId },
+      data: {
+        completed: completed,
+        completedAt: completed ? new Date() : null,
+      },
+    });
+  });
+
+  return NextResponse.json({ ok: true });
 }
