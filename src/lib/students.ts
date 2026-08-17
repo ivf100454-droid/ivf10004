@@ -59,11 +59,6 @@ export async function withdrawStudent(studentId: string) {
     return account;
   });
 
-  // 세션 무효화는 별도 테이블(auth_sessions) updateMany이므로 같은 트랜잭션에
-  // 포함해도 되지만, 트랜잭션 타임아웃을 늘리지 않기 위해 바로 이어서 호출한다.
-  // 두 단계 사이 실패 가능성은 매우 낮지만(같은 프로세스, 즉시 실행), 완전한
-  // 원자성이 필요하면 revokeAllSessionsForAccount 호출도 위 트랜잭션 안으로
-  // 옮길 수 있다 — 운영 데이터 늘어나면 재검토.
   await revokeAllSessionsForAccount(account.accountId);
 
   return account;
@@ -75,4 +70,22 @@ export async function changeStudentClass(studentId: string, newClassId: string |
     where: { studentId },
     data: { currentClassId: newClassId },
   });
+}
+
+/**
+ * 비밀번호 재설정. 실제 비밀번호는 해시로만 저장되어 있어 "찾기"가 불가능하므로,
+ * 학생이 잊어버렸다고 하면 관리자가 새 비밀번호를 정해서(또는 자동생성해서) 이걸로
+ * 교체하는 방식만 가능하다. 기존 로그인 세션은 전부 무효화해 새 비밀번호로만 재로그인하게 한다.
+ */
+export async function resetStudentPassword(studentId: string, newPassword: string) {
+  const passwordHash = await hashPassword(newPassword);
+
+  const account = await prisma.studentAccount.update({
+    where: { studentId },
+    data: { passwordHash },
+  });
+
+  await revokeAllSessionsForAccount(account.accountId);
+
+  return account;
 }
