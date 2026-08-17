@@ -55,6 +55,7 @@ export async function POST(req: NextRequest) {
           hasPhotoSubmission: item.hasPhotoSubmission,
           hasAudioSubmission: item.hasAudioSubmission,
           hasVideoSubmission: item.hasVideoSubmission,
+          hasFileSubmission: item.hasFileSubmission,
           requiredFeatures: item.requiredFeatures as any,
         })),
       },
