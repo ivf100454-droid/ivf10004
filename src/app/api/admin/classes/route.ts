@@ -32,6 +32,11 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "클래스 이름을 입력해주세요." }, { status: 400 });
   }
 
+  const dup = await prisma.class.findFirst({ where: { name: name } });
+  if (dup) {
+    return NextResponse.json({ error: `"${name}" 수업이 이미 존재합니다.` }, { status: 409 });
+  }
+
   const last = await prisma.class.findFirst({ orderBy: { sortOrder: "desc" } });
   const nextOrder = last ? last.sortOrder + 1 : 0;
 
