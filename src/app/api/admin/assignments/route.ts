@@ -5,8 +5,8 @@ import { getAcademyToday } from "@/lib/timezone";
 
 /**
  * 템플릿을 학생에게 배정한다 (기능 플래그 구조로 값 복사).
- * 이전 배치와 동일한 단순화: 클릭할 때마다 새 checklist_assignment를 만든다
- * (27번 중복배정 유지/추가/교체 선택 UI는 다음 배치로 미룸).
+ * 같은 학생·같은 날짜에 이미 배정이 있으면 새로 배정하기 전에 기존 배정을
+ * 전부 삭제한다 (배정을 여러 번 눌러도 중복 항목이 쌓이지 않도록).
  */
 export async function POST(req: NextRequest) {
   const admin = await getAdminFromRequest(req);
@@ -30,11 +30,17 @@ export async function POST(req: NextRequest) {
   if (!template) return NextResponse.json({ error: "존재하지 않는 템플릿입니다." }, { status: 404 });
 
   const todayStr = getAcademyToday();
+  const todayDate = new Date(`${todayStr}T00:00:00.000Z`);
+
+  // 같은 학생·같은 날짜의 기존 배정이 있으면 새로 만들기 전에 전부 삭제한다.
+  await prisma.checklistAssignment.deleteMany({
+    where: { studentId: student.studentId, checklistDate: todayDate },
+  });
 
   const assignment = await prisma.checklistAssignment.create({
     data: {
       studentId: student.studentId,
-      checklistDate: new Date(`${todayStr}T00:00:00.000Z`),
+      checklistDate: todayDate,
       classIdSnapshot: student.currentClassId,
       classNameSnapshot: student.currentClass?.name ?? null,
       sourceTemplateId: template.templateId,
