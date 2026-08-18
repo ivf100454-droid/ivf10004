@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 
-type Student = { studentId: string; name: string };
+type Student = { studentId: string; name: string; studentStatus: string };
 type Template = { templateId: string; name: string; items: { templateItemId: string }[] };
 
 type AssignedItem = {
@@ -539,6 +539,9 @@ export default function ChecklistTestPage() {
     }
   }
 
+  // 퇴원 처리된 학생은 배정/조회 대상에서 제외한다.
+  const activeStudents = students.filter((s) => s.studentStatus !== "withdrawn");
+
   const box: React.CSSProperties = {
     padding: 10,
     fontSize: 16,
@@ -585,7 +588,7 @@ export default function ChecklistTestPage() {
           style={box}
         >
           <option value="">학생 선택</option>
-          {students.map((s) => (
+          {activeStudents.map((s) => (
             <option key={s.studentId} value={s.studentId}>
               {s.name}
             </option>
@@ -612,7 +615,7 @@ export default function ChecklistTestPage() {
       <h2 style={{ fontSize: 16, marginTop: 28, marginBottom: 8 }}>2. 오늘 체크리스트 보기</h2>
       <select value={viewStudentId} onChange={(e) => setViewStudentId(e.target.value)} style={box}>
         <option value="">학생 선택</option>
-        {students.map((s) => (
+        {activeStudents.map((s) => (
           <option key={s.studentId} value={s.studentId}>
             {s.name}
           </option>
