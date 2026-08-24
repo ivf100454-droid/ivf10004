@@ -7,7 +7,13 @@ import { colors, fontFamily } from "../theme";
 
 type AssignedItem = { assignedItemId: string; title: string; completed: boolean };
 type Assignment = { assignmentId: string; items: AssignedItem[] };
-type TodayData = { assignments: Assignment[]; progress: number };
+type TodayData = {
+  assignments: Assignment[];
+  progress: number;
+  streak: number;
+  earnedScore: number;
+  maxScore: number;
+};
 
 export default function CompletePage() {
   const [data, setData] = useState<TodayData | null>(null);
@@ -65,6 +71,22 @@ export default function CompletePage() {
             </div>
             <div style={{ fontSize: 11, color: colors.textSecondary }}>완료한 과제</div>
           </div>
+          {data && data.maxScore > 0 && (
+            <div style={{ flex: 1, background: colors.card, borderRadius: 16, padding: 16, textAlign: "center", boxShadow: "0 2px 10px rgba(21,42,84,0.05)" }}>
+              <div style={{ fontSize: 20 }}>⭐</div>
+              <div style={{ fontSize: 16, fontWeight: 800, color: colors.navy, marginTop: 4 }}>
+                {data.earnedScore} / {data.maxScore}
+              </div>
+              <div style={{ fontSize: 11, color: colors.textSecondary }}>획득한 점수</div>
+            </div>
+          )}
+          {!!data?.streak && (
+            <div style={{ flex: 1, background: colors.card, borderRadius: 16, padding: 16, textAlign: "center", boxShadow: "0 2px 10px rgba(21,42,84,0.05)" }}>
+              <div style={{ fontSize: 20 }}>🔥</div>
+              <div style={{ fontSize: 16, fontWeight: 800, color: colors.navy, marginTop: 4 }}>{data.streak}일</div>
+              <div style={{ fontSize: 11, color: colors.textSecondary }}>연속 학습</div>
+            </div>
+          )}
         </div>
 
         <div style={{ fontSize: 14, fontWeight: 800, color: colors.navy, marginBottom: 10 }}>✅ 오늘 완료한 과제</div>
