@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db";
 import { getStudentFromRequest } from "@/lib/studentAuth";
 import { getAcademyToday } from "@/lib/timezone";
 import { getSignedDownloadUrl } from "@/lib/storage";
+import { computeStreak } from "@/lib/streak";
 
 /**
  * 로그인한 학생 본인의 "오늘" 체크리스트 배정·항목·진행률을 반환한다.
@@ -35,6 +36,13 @@ export async function GET(req: NextRequest) {
   const progress =
     progressItems.length === 0 ? 0 : Math.round((completedCount / progressItems.length) * 100);
 
+  // 오늘 점수형 항목들의 합산 점수 (예: 획득한 점수 98/100)
+  const scoredItems = allItems.filter((i) => i.hasScore && i.maxScore != null);
+  const earnedScore = scoredItems.reduce((sum, i) => sum + (i.score ?? 0), 0);
+  const maxScore = scoredItems.reduce((sum, i) => sum + (i.maxScore ?? 0), 0);
+
+  const streak = await computeStreak(student.studentId);
+
   const videoIds = Array.from(
     new Set(allItems.map((i) => i.teachingVideoId).filter(function (v): v is string { return !!v; }))
   );
@@ -63,5 +71,8 @@ export async function GET(req: NextRequest) {
     date: todayStr,
     assignments: assignmentsOut,
     progress,
+    streak,
+    earnedScore,
+    maxScore,
   });
 }
