@@ -28,6 +28,9 @@ type TodayData = {
   className: string | null;
   assignments: Assignment[];
   progress: number;
+  streak: number;
+  earnedScore: number;
+  maxScore: number;
 };
 
 function statusLabel(item: AssignedItem) {
@@ -212,7 +215,7 @@ export default function StudentPage() {
           <span style={{ fontSize: 20 }}>🔔</span>
         </div>
 
-        <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 18 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12 }}>
           <div
             style={{
               width: 52,
@@ -247,6 +250,25 @@ export default function StudentPage() {
             )}
           </div>
         </div>
+
+        {!!data?.streak && (
+          <div
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 6,
+              background: colors.orangeLight,
+              color: "#B5690B",
+              fontSize: 13,
+              fontWeight: 700,
+              borderRadius: 999,
+              padding: "6px 12px",
+              marginBottom: 14,
+            }}
+          >
+            🔥 {data.streak}일 연속 학습중!
+          </div>
+        )}
 
         <div
           style={{
