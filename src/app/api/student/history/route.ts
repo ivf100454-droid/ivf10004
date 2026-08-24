@@ -26,10 +26,8 @@ export async function GET(req: NextRequest) {
     orderBy: { checklistDate: "desc" },
   });
 
-  const byDate = new Map
-    string,
-    { date: string; items: (typeof assignments)[number]["items"] }
-  >();
+  type DateBucket = { date: string; items: typeof assignments[number]["items"] };
+  const byDate = new Map<string, DateBucket>();
   for (const a of assignments) {
     const dateStr = a.checklistDate.toISOString().slice(0, 10);
     if (!byDate.has(dateStr)) byDate.set(dateStr, { date: dateStr, items: [] });
