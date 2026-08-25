@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { colors, fontFamily } from "../theme";
 
 type ClassItem = {
   classId: string;
@@ -25,6 +26,41 @@ const STANDARD_CLASS_NAMES = [
   "Up 1", "Up 2", "Up 3",
   "Top 1", "Top 2", "Top 3",
 ];
+
+const card: React.CSSProperties = {
+  background: colors.card,
+  borderRadius: 16,
+  boxShadow: "0 2px 10px rgba(21,42,84,0.05)",
+};
+const box: React.CSSProperties = {
+  padding: "12px 14px",
+  fontSize: 15,
+  width: "100%",
+  boxSizing: "border-box",
+  borderRadius: 10,
+  border: `1px solid ${colors.border}`,
+  fontFamily,
+};
+const primaryBtn: React.CSSProperties = {
+  padding: "10px 18px",
+  fontSize: 14,
+  fontWeight: 700,
+  color: "#fff",
+  background: colors.blueGradient,
+  border: "none",
+  borderRadius: 10,
+  cursor: "pointer",
+};
+const ghostBtn: React.CSSProperties = {
+  padding: "6px 12px",
+  fontSize: 13,
+  fontWeight: 600,
+  color: colors.blue,
+  background: colors.blueLight,
+  border: "none",
+  borderRadius: 8,
+  cursor: "pointer",
+};
 
 export default function ClassesPage() {
   const [loggedIn, setLoggedIn] = useState(false);
@@ -190,59 +226,62 @@ export default function ClassesPage() {
     setSavingStudentId(null);
   }
 
-  const box: React.CSSProperties = { padding: 10, fontSize: 15, width: "100%", boxSizing: "border-box" };
   const editingClass = classes.find((c) => c.classId === editingId);
   const existingNames = new Set(classes.map((c) => c.name));
   const availableNames = STANDARD_CLASS_NAMES.filter((n) => !existingNames.has(n));
 
   if (!loggedIn) {
     return (
-      <div style={{ maxWidth: 420, margin: "40px auto", padding: 16, fontFamily: "sans-serif" }}>
-        <h1 style={{ fontSize: 20, marginBottom: 16 }}>관리자 로그인</h1>
+      <div style={{ maxWidth: 420, margin: "40px auto", padding: 16, fontFamily }}>
+        <h1 style={{ fontSize: 20, marginBottom: 16, color: colors.navy }}>관리자 로그인</h1>
         <form onSubmit={handleLogin} style={{ display: "flex", flexDirection: "column", gap: 12 }}>
           <input placeholder="아이디" value={loginId} onChange={(e) => setLoginId(e.target.value)} style={box} />
           <input placeholder="비밀번호" type="password" value={password} onChange={(e) => setPassword(e.target.value)} style={box} />
-          <button type="submit" style={{ padding: 12, fontSize: 16 }}>
+          <button type="submit" style={primaryBtn}>
             로그인
           </button>
         </form>
-        {loginMsg && <p style={{ color: "crimson" }}>{loginMsg}</p>}
+        {loginMsg && <p style={{ color: colors.pink }}>{loginMsg}</p>}
       </div>
     );
   }
 
   if (editingId && editingClass) {
     return (
-      <div style={{ maxWidth: 520, margin: "24px auto", padding: 16, fontFamily: "sans-serif" }}>
-        <button onClick={closeEdit} style={{ marginBottom: 16, padding: "6px 12px", fontSize: 13 }}>
+      <div style={{ maxWidth: 520, margin: "24px auto", padding: 16, fontFamily }}>
+        <button onClick={closeEdit} style={{ marginBottom: 16, padding: "6px 12px", fontSize: 13, background: "none", border: "none", color: colors.textSecondary, cursor: "pointer" }}>
           ← 목록으로
         </button>
-        <h1 style={{ fontSize: 20, marginBottom: 16 }}>수업 정보</h1>
+        <h1 style={{ fontSize: 20, marginBottom: 16, color: colors.navy }}>수업 정보</h1>
 
         <div style={{ display: "flex", gap: 8, marginBottom: 20 }}>
           <input value={editName} onChange={(e) => setEditName(e.target.value)} style={{ ...box, flex: 1 }} />
-          <button onClick={saveEditName} style={{ padding: "0 16px" }}>
+          <button onClick={saveEditName} style={{ ...primaryBtn, padding: "0 18px" }}>
             저장
           </button>
         </div>
 
-        <p style={{ fontSize: 14, fontWeight: 600, marginBottom: 8 }}>체크리스트</p>
-        <div style={{ background: "#f0f0f0", borderRadius: 8, padding: 12, marginBottom: 20 }}>
+        <p style={{ fontSize: 14, fontWeight: 700, marginBottom: 8, color: colors.navy }}>체크리스트</p>
+        <div style={{ ...card, padding: 14, marginBottom: 20 }}>
           {editingClass.templateName ? (
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-              <span style={{ fontSize: 14, fontWeight: 500 }}>{editingClass.templateName}</span>
-              <button onClick={() => setClassTemplate(null)} style={{ fontSize: 12, padding: "4px 8px" }}>
+              <span style={{ fontSize: 14, fontWeight: 600, color: colors.navy }}>{editingClass.templateName}</span>
+              <button onClick={() => setClassTemplate(null)} style={ghostBtn}>
                 연결 해제
               </button>
             </div>
           ) : templates.length === 0 ? (
-            <p style={{ fontSize: 13, color: "#888", margin: 0 }}>
+            <p style={{ fontSize: 13, color: colors.textSecondary, margin: 0 }}>
               아직 생성된 체크리스트 템플릿이 없습니다. 템플릿 생성 후 다시 시도하세요.
             </p>
           ) : (
             <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
               {templates.map((t) => (
-                <button key={t.templateId} onClick={() => setClassTemplate(t.templateId)} style={{ textAlign: "left", padding: 10 }}>
+                <button
+                  key={t.templateId}
+                  onClick={() => setClassTemplate(t.templateId)}
+                  style={{ textAlign: "left", padding: 10, borderRadius: 8, border: `1px solid ${colors.border}`, background: colors.bg, cursor: "pointer", fontSize: 14, color: colors.navy }}
+                >
                   {t.name}
                 </button>
               ))}
@@ -250,11 +289,11 @@ export default function ClassesPage() {
           )}
         </div>
 
-        {editMsg && <p style={{ fontSize: 13, color: "crimson", marginBottom: 8 }}>{editMsg}</p>}
+        {editMsg && <p style={{ fontSize: 13, color: colors.pink, marginBottom: 8 }}>{editMsg}</p>}
 
         <button
           onClick={handleDeleteClass}
-          style={{ width: "100%", padding: 10, fontSize: 14, color: "#c0392b", border: "1px solid #c0392b", borderRadius: 8, background: "none" }}
+          style={{ width: "100%", padding: 12, fontSize: 14, fontWeight: 700, color: colors.pink, border: `1px solid ${colors.pink}`, borderRadius: 10, background: "none", cursor: "pointer" }}
         >
           수업 삭제
         </button>
@@ -263,15 +302,15 @@ export default function ClassesPage() {
   }
 
   return (
-    <div style={{ maxWidth: 560, margin: "24px auto", padding: 16, fontFamily: "sans-serif" }}>
-      <h1 style={{ fontSize: 20, marginBottom: 16 }}>수업 생성</h1>
+    <div style={{ maxWidth: 640, margin: "24px auto", padding: 16, fontFamily }}>
+      <h1 style={{ fontSize: 20, fontWeight: 800, marginBottom: 16, color: colors.navy }}>수업 생성</h1>
 
       {classes.length === 0 ? (
-        <p style={{ color: "#888", marginBottom: 12 }}>아직 생성된 수업이 없습니다.</p>
+        <p style={{ color: colors.textSecondary, marginBottom: 12 }}>아직 생성된 수업이 없습니다.</p>
       ) : (
         <>
-          <p style={{ fontSize: 12, color: "#888", marginBottom: 8 }}>길게 눌러 순서를 바꿀 수 있어요</p>
-          <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 16 }}>
+          <p style={{ fontSize: 12, color: colors.textMuted, marginBottom: 8 }}>길게 눌러 순서를 바꿀 수 있어요</p>
+          <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 24 }}>
             {classes.map((c, idx) => (
               <div
                 key={c.classId}
@@ -283,78 +322,106 @@ export default function ClassesPage() {
                 style={{
                   display: "flex",
                   alignItems: "center",
-                  gap: 8,
-                  background: "#f5f5f5",
-                  border: "1px solid #ddd",
-                  borderRadius: 8,
-                  padding: "10px 12px",
+                  gap: 10,
+                  ...card,
+                  padding: "12px 14px",
                   cursor: "pointer",
                 }}
               >
-                <span style={{ color: "#aaa" }}>⠿</span>
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: 14, fontWeight: 500 }}>
-                    {c.name} <span style={{ color: "#888", fontWeight: 400 }}>({c.studentCount}명)</span>
-                  </div>
-                  <div style={{ fontSize: 12, color: "#888" }}>{c.templateName || "체크리스트 없음 · 눌러서 연결"}</div>
+                <span style={{ color: colors.textMuted }}>⠿</span>
+                <div
+                  style={{
+                    width: 34,
+                    height: 34,
+                    borderRadius: 10,
+                    background: colors.blueLight,
+                    color: colors.blue,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    fontSize: 15,
+                    fontWeight: 800,
+                    flexShrink: 0,
+                  }}
+                >
+                  🏫
                 </div>
-                <span style={{ color: "#aaa" }}>›</span>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 14, fontWeight: 700, color: colors.navy }}>
+                    {c.name} <span style={{ color: colors.textMuted, fontWeight: 500 }}>({c.studentCount}명)</span>
+                  </div>
+                  <div style={{ fontSize: 12, color: colors.textSecondary }}>{c.templateName || "체크리스트 없음 · 눌러서 연결"}</div>
+                </div>
+                <span style={{ color: colors.textMuted }}>›</span>
               </div>
             ))}
           </div>
         </>
       )}
 
-      <h2 style={{ fontSize: 16, marginBottom: 8 }}>수업추가</h2>
-      {availableNames.length === 0 ? (
-        <p style={{ fontSize: 13, color: "#888", marginBottom: 16 }}>기본 18개 클래스가 모두 생성되었습니다.</p>
-      ) : (
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginBottom: 8 }}>
-          {availableNames.map((name) => (
-            <button
-              key={name}
-              onClick={() => handleCreateClass(name)}
-              disabled={creatingName === name}
-              style={{ padding: "10px 4px", fontSize: 13 }}
-            >
-              {creatingName === name ? "..." : name}
-            </button>
-          ))}
-        </div>
-      )}
-      {classMsg && <p style={{ fontSize: 13, marginBottom: 16 }}>{classMsg}</p>}
+      <div style={{ ...card, padding: 18, marginBottom: 24 }}>
+        <h2 style={{ fontSize: 15, fontWeight: 800, marginBottom: 10, color: colors.navy }}>수업 추가</h2>
+        {availableNames.length === 0 ? (
+          <p style={{ fontSize: 13, color: colors.textSecondary }}>기본 18개 클래스가 모두 생성되었습니다.</p>
+        ) : (
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginBottom: 8 }}>
+            {availableNames.map((name) => (
+              <button
+                key={name}
+                onClick={() => handleCreateClass(name)}
+                disabled={creatingName === name}
+                style={{
+                  padding: "10px 4px",
+                  fontSize: 13,
+                  fontWeight: 600,
+                  borderRadius: 8,
+                  border: `1px solid ${colors.border}`,
+                  background: colors.bg,
+                  color: colors.navy,
+                  cursor: "pointer",
+                }}
+              >
+                {creatingName === name ? "..." : name}
+              </button>
+            ))}
+          </div>
+        )}
+        {classMsg && <p style={{ fontSize: 13, color: colors.blue, marginTop: 8 }}>{classMsg}</p>}
+      </div>
 
-      <h2 style={{ fontSize: 16, marginTop: 28, marginBottom: 8 }}>학생별 수업 배정</h2>
-      <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14 }}>
-        <thead>
-          <tr style={{ textAlign: "left", borderBottom: "1px solid #ccc" }}>
-            <th style={{ padding: 6 }}>이름</th>
-            <th style={{ padding: 6 }}>현재 수업</th>
-          </tr>
-        </thead>
-        <tbody>
-          {students.map((s) => (
-            <tr key={s.studentId} style={{ borderBottom: "1px solid #eee" }}>
-              <td style={{ padding: 6 }}>{s.name}</td>
-              <td style={{ padding: 6 }}>
-                <select
-                  value={s.currentClassId ?? ""}
-                  disabled={savingStudentId === s.studentId}
-                  onChange={(e) => handleAssignStudent(s.studentId, e.target.value)}
-                  style={{ padding: 6, fontSize: 14 }}
-                >
-                  <option value="">수업 없음</option>
-                  {classes.map((c) => (
-                    <option key={c.classId} value={c.classId}>
-                      {c.name}
-                    </option>
-                  ))}
-                </select>
-              </td>
+      <div style={{ ...card, padding: 18 }}>
+        <h2 style={{ fontSize: 15, fontWeight: 800, marginBottom: 12, color: colors.navy }}>학생별 수업 배정</h2>
+        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14 }}>
+          <thead>
+            <tr style={{ textAlign: "left", borderBottom: `1px solid ${colors.border}` }}>
+              <th style={{ padding: 8, color: colors.textSecondary, fontWeight: 600 }}>이름</th>
+              <th style={{ padding: 8, color: colors.textSecondary, fontWeight: 600 }}>현재 수업</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {students.map((s) => (
+              <tr key={s.studentId} style={{ borderBottom: `1px solid ${colors.border}` }}>
+                <td style={{ padding: 8, color: colors.navy, fontWeight: 600 }}>{s.name}</td>
+                <td style={{ padding: 8 }}>
+                  <select
+                    value={s.currentClassId ?? ""}
+                    disabled={savingStudentId === s.studentId}
+                    onChange={(e) => handleAssignStudent(s.studentId, e.target.value)}
+                    style={{ padding: 8, fontSize: 14, borderRadius: 8, border: `1px solid ${colors.border}` }}
+                  >
+                    <option value="">수업 없음</option>
+                    {classes.map((c) => (
+                      <option key={c.classId} value={c.classId}>
+                        {c.name}
+                      </option>
+                    ))}
+                  </select>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }
