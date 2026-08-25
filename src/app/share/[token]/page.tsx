@@ -18,6 +18,7 @@ type SharedItem = {
   hasPhotoSubmission: boolean;
   hasAudioSubmission: boolean;
   hasVideoSubmission: boolean;
+  hasFileSubmission: boolean;
   completed: boolean;
   photoUrl: string | null;
   photoMimeType: string | null;
@@ -26,6 +27,9 @@ type SharedItem = {
   audioFilename: string | null;
   videoUrl: string | null;
   videoFilename: string | null;
+  fileUrl: string | null;
+  fileMimeType: string | null;
+  fileFilename: string | null;
 };
 type SharedAssignment = { assignmentId: string; items: SharedItem[] };
 type SharedData = {
@@ -180,6 +184,17 @@ export default function SharePage({ params }: { params: { token: string } }) {
                   )}
                   {item.hasVideoSubmission && !item.videoUrl && (
                     <div style={{ fontSize: 13, color: "#aaa", marginTop: 4 }}>아직 제출된 영상이 없습니다.</div>
+                  )}
+
+                  {item.hasFileSubmission && item.fileUrl && (
+                    <div style={{ marginTop: 6 }}>
+                      <a href={item.fileUrl} target="_blank" rel="noreferrer">
+                        📎 {item.fileFilename || "제출 파일 열기/다운로드"}
+                      </a>
+                    </div>
+                  )}
+                  {item.hasFileSubmission && !item.fileUrl && (
+                    <div style={{ fontSize: 13, color: "#aaa", marginTop: 4 }}>아직 제출된 파일이 없습니다.</div>
                   )}
                 </div>
               );
