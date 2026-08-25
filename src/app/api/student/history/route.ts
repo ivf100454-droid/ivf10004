@@ -4,33 +4,39 @@ import { getStudentFromRequest } from "@/lib/studentAuth";
 import { getAcademyToday } from "@/lib/timezone";
 
 /**
- * 로그인한 학생 본인의 최근 학습 기록(기본 14일)을 날짜별로 반환한다.
- * 주간 요약(완료 과제 수, 평균 점수)과 날짜별 완료 항목 목록을 함께 내려준다.
+ * 로그인한 학생 본인의 "월 단위" 학습 기록을 반환한다.
+ * ?year=2026&month=8 (1~12) 형식으로 받아 그 달 전체의 날짜별 진행률(캘린더용)과
+ * 날짜별 완료 항목 상세(dailyRecords), 이번 달 요약을 함께 내려준다.
  */
 export async function GET(req: NextRequest) {
   const student = await getStudentFromRequest(req);
   if (!student) return NextResponse.json({ error: "로그인이 필요합니다." }, { status: 401 });
 
-  const days = Math.min(30, Math.max(1, Number(req.nextUrl.searchParams.get("days")) || 14));
   const todayStr = getAcademyToday();
-  const today = new Date(`${todayStr}T00:00:00.000Z`);
-  const from = new Date(today);
-  from.setUTCDate(from.getUTCDate() - (days - 1));
+  const [todayYear, todayMonth] = todayStr.split("-").map(Number);
+
+  const year = Number(req.nextUrl.searchParams.get("year")) || todayYear;
+  const month = Number(req.nextUrl.searchParams.get("month")) || todayMonth;
+
+  const monthStr = String(month).padStart(2, "0");
+  const startDate = new Date(`${year}-${monthStr}-01T00:00:00.000Z`);
+  const endDate = new Date(Date.UTC(year, month, 1)); // 다음달 1일 (UTC 기준 day 경계)
 
   const assignments = await prisma.checklistAssignment.findMany({
     where: {
       studentId: student.studentId,
-      checklistDate: { gte: from, lte: today },
+      checklistDate: { gte: startDate, lt: endDate },
     },
     include: { items: { orderBy: { sortOrder: "asc" } } },
-    orderBy: { checklistDate: "desc" },
+    orderBy: { checklistDate: "asc" },
   });
 
-  type DateBucket = { date: string; items: typeof assignments[number]["items"] };
+  type DateBucket = { date: string; day: number; items: typeof assignments[number]["items"] };
   const byDate = new Map<string, DateBucket>();
   for (const a of assignments) {
     const dateStr = a.checklistDate.toISOString().slice(0, 10);
-    if (!byDate.has(dateStr)) byDate.set(dateStr, { date: dateStr, items: [] });
+    const day = a.checklistDate.getUTCDate();
+    if (!byDate.has(dateStr)) byDate.set(dateStr, { date: dateStr, day, items: [] });
     byDate.get(dateStr)!.items.push(...a.items);
   }
 
@@ -68,33 +74,32 @@ export async function GET(req: NextRequest) {
       };
     });
 
-  // 최근 7일(오늘 포함) 요일별 완료 여부 스트립
-  const weekStrip: { date: string; allDone: boolean; hasData: boolean }[] = [];
-  for (let i = 6; i >= 0; i--) {
-    const d = new Date(today);
-    d.setUTCDate(d.getUTCDate() - i);
-    const dateStr = d.toISOString().slice(0, 10);
-    const rec = dailyRecords.find((r) => r.date === dateStr);
-    weekStrip.push({
-      date: dateStr,
-      hasData: !!rec && rec.totalCount > 0,
-      allDone: !!rec && rec.totalCount > 0 && rec.completedCount >= rec.totalCount,
-    });
-  }
+  // 캘린더용: 이 달에 배정이 있었던 날짜만 day/progress로 축약해서 내려준다.
+  const days = Array.from(byDate.values())
+    .map((d) => {
+      const progressItems = d.items.filter((i) => i.isProgressItem);
+      const completedCount = progressItems.filter((i) => i.completed).length;
+      const progress =
+        progressItems.length === 0 ? 0 : Math.round((completedCount / progressItems.length) * 100);
+      return { day: d.day, progress };
+    })
+    .sort((a, b) => a.day - b.day);
 
-  const weekRecords = dailyRecords.filter((r) => weekStrip.some((w) => w.date === r.date));
-  const weekCompleted = weekRecords.reduce((sum, r) => sum + r.completedCount, 0);
-  const weekTotal = weekRecords.reduce((sum, r) => sum + r.totalCount, 0);
-  const weekScored = weekRecords.filter((r) => r.avgScorePct !== null);
-  const weekAvgScore =
-    weekScored.length === 0
+  // 이번 달 요약(완료 과제 수, 평균 점수)
+  const monthCompleted = dailyRecords.reduce((sum, r) => sum + r.completedCount, 0);
+  const monthTotal = dailyRecords.reduce((sum, r) => sum + r.totalCount, 0);
+  const monthScored = dailyRecords.filter((r) => r.avgScorePct !== null);
+  const monthAvgScore =
+    monthScored.length === 0
       ? null
-      : Math.round(weekScored.reduce((sum, r) => sum + (r.avgScorePct || 0), 0) / weekScored.length);
+      : Math.round(monthScored.reduce((sum, r) => sum + (r.avgScorePct || 0), 0) / monthScored.length);
 
   return NextResponse.json({
     studentName: student.name,
-    weekStrip,
-    weekSummary: { completedCount: weekCompleted, totalCount: weekTotal, avgScorePct: weekAvgScore },
+    year,
+    month,
+    days,
+    monthSummary: { completedCount: monthCompleted, totalCount: monthTotal, avgScorePct: monthAvgScore },
     dailyRecords,
   });
 }
