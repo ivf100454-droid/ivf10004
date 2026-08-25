@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { colors, fontFamily } from "../theme";
 
 type TeachingVideo = { videoId: string; title: string };
 
@@ -73,6 +74,41 @@ const SUBMIT_FEATURES: { key: keyof Draft; label: string }[] = [
   { key: "hasAudioSubmission", label: "🎤 음성 제출" },
   { key: "hasFileSubmission", label: "📄 파일 제출" },
 ];
+
+const card: React.CSSProperties = {
+  background: colors.card,
+  borderRadius: 16,
+  boxShadow: "0 2px 10px rgba(21,42,84,0.05)",
+};
+const box: React.CSSProperties = {
+  padding: "12px 14px",
+  fontSize: 15,
+  width: "100%",
+  boxSizing: "border-box",
+  borderRadius: 10,
+  border: `1px solid ${colors.border}`,
+  fontFamily,
+};
+const primaryBtn: React.CSSProperties = {
+  padding: "13px 18px",
+  fontSize: 15,
+  fontWeight: 700,
+  color: "#fff",
+  background: colors.blueGradient,
+  border: "none",
+  borderRadius: 10,
+  cursor: "pointer",
+};
+const secondaryBtn: React.CSSProperties = {
+  padding: "10px 16px",
+  fontSize: 14,
+  fontWeight: 600,
+  color: colors.textSecondary,
+  background: colors.bg,
+  border: `1px solid ${colors.border}`,
+  borderRadius: 10,
+  cursor: "pointer",
+};
 
 export default function ActivitiesPage() {
   const [loggedIn, setLoggedIn] = useState(false);
@@ -226,20 +262,18 @@ export default function ActivitiesPage() {
     }
   }
 
-  const box: React.CSSProperties = { padding: 10, fontSize: 15, width: "100%", boxSizing: "border-box" };
-
   if (!loggedIn) {
     return (
-      <div style={{ maxWidth: 420, margin: "40px auto", padding: 16, fontFamily: "sans-serif" }}>
-        <h1 style={{ fontSize: 20, marginBottom: 16 }}>관리자 로그인</h1>
+      <div style={{ maxWidth: 420, margin: "40px auto", padding: 16, fontFamily }}>
+        <h1 style={{ fontSize: 20, marginBottom: 16, color: colors.navy }}>관리자 로그인</h1>
         <form onSubmit={handleLogin} style={{ display: "flex", flexDirection: "column", gap: 12 }}>
           <input placeholder="아이디" value={loginId} onChange={(e) => setLoginId(e.target.value)} style={box} />
           <input placeholder="비밀번호" type="password" value={password} onChange={(e) => setPassword(e.target.value)} style={box} />
-          <button type="submit" style={{ padding: 12, fontSize: 16 }}>
+          <button type="submit" style={primaryBtn}>
             로그인
           </button>
         </form>
-        {loginMsg && <p style={{ color: "crimson" }}>{loginMsg}</p>}
+        {loginMsg && <p style={{ color: colors.pink }}>{loginMsg}</p>}
       </div>
     );
   }
@@ -247,8 +281,8 @@ export default function ActivitiesPage() {
   if (mode === "add" || mode === "edit") {
     const editingActivity = mode === "edit" ? activities.find((a) => a.activityId === editingId) : null;
     return (
-      <div style={{ maxWidth: 560, margin: "24px auto", padding: 16, fontFamily: "sans-serif" }}>
-        <h1 style={{ fontSize: 20, marginBottom: 16 }}>{mode === "edit" ? "활동 수정" : "활동 추가"}</h1>
+      <div style={{ maxWidth: 560, margin: "24px auto", padding: 16, fontFamily }}>
+        <h1 style={{ fontSize: 20, fontWeight: 800, marginBottom: 16, color: colors.navy }}>{mode === "edit" ? "활동 수정" : "활동 추가"}</h1>
         <form onSubmit={handleSave} style={{ display: "flex", flexDirection: "column", gap: 16 }}>
           <input
             placeholder="활동명 (예: 팝송부르기, 단어시험, 말하기)"
@@ -258,12 +292,12 @@ export default function ActivitiesPage() {
           />
 
           <div>
-            <p style={{ fontSize: 14, fontWeight: 600, marginBottom: 8 }}>학생이 해야 할 것</p>
+            <p style={{ fontSize: 14, fontWeight: 700, marginBottom: 8, color: colors.navy }}>학생이 해야 할 것</p>
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
               {SUBMIT_FEATURES.map((f) => (
-                <label key={f.key} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 10px", background: "#f5f5f5", borderRadius: 8 }}>
-                  <input type="checkbox" checked={!!draft[f.key]} onChange={() => toggleFeature(f.key)} />
-                  <span style={{ fontSize: 14 }}>{f.label}</span>
+                <label key={f.key} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", ...card }}>
+                  <input type="checkbox" checked={!!draft[f.key]} onChange={() => toggleFeature(f.key)} style={{ width: 18, height: 18 }} />
+                  <span style={{ fontSize: 14, color: colors.navy }}>{f.label}</span>
                   {f.key === "hasCount" && draft.hasCount && (
                     <input
                       type="number"
@@ -271,7 +305,7 @@ export default function ActivitiesPage() {
                       placeholder="목표 횟수"
                       value={draft.targetCount}
                       onChange={(e) => setDraft({ ...draft, targetCount: e.target.value })}
-                      style={{ width: 90, marginLeft: "auto", padding: 6 }}
+                      style={{ width: 90, marginLeft: "auto", padding: 8, borderRadius: 8, border: `1px solid ${colors.border}` }}
                     />
                   )}
                   {f.key === "hasScore" && draft.hasScore && (
@@ -282,7 +316,7 @@ export default function ActivitiesPage() {
                       placeholder="만점"
                       value={draft.maxScore}
                       onChange={(e) => setDraft({ ...draft, maxScore: e.target.value })}
-                      style={{ width: 90, marginLeft: "auto", padding: 6 }}
+                      style={{ width: 90, marginLeft: "auto", padding: 8, borderRadius: 8, border: `1px solid ${colors.border}` }}
                     />
                   )}
                 </label>
@@ -291,10 +325,10 @@ export default function ActivitiesPage() {
           </div>
 
           <div>
-            <p style={{ fontSize: 14, fontWeight: 600, marginBottom: 8 }}>관리자가 학생에게 보여줄 자료</p>
-            <div style={{ display: "flex", flexDirection: "column", gap: 10, background: "#f0f0f0", borderRadius: 8, padding: 12 }}>
+            <p style={{ fontSize: 14, fontWeight: 700, marginBottom: 8, color: colors.navy }}>관리자가 학생에게 보여줄 자료</p>
+            <div style={{ display: "flex", flexDirection: "column", gap: 12, ...card, padding: 16 }}>
               <div>
-                <label style={{ fontSize: 13, color: "#666", display: "block", marginBottom: 4 }}>참고 링크 URL</label>
+                <label style={{ fontSize: 13, color: colors.textSecondary, display: "block", marginBottom: 4 }}>참고 링크 URL</label>
                 <input
                   placeholder="https://..."
                   value={draft.materialLinkUrl}
@@ -303,7 +337,7 @@ export default function ActivitiesPage() {
                 />
               </div>
               <div>
-                <label style={{ fontSize: 13, color: "#666", display: "block", marginBottom: 4 }}>학습영상 (미리 올려둔 영상 중 선택)</label>
+                <label style={{ fontSize: 13, color: colors.textSecondary, display: "block", marginBottom: 4 }}>학습영상 (미리 올려둔 영상 중 선택)</label>
                 <select
                   value={draft.materialVideoId}
                   onChange={(e) => setDraft({ ...draft, materialVideoId: e.target.value })}
@@ -318,11 +352,11 @@ export default function ActivitiesPage() {
                 </select>
               </div>
               <div>
-                <label style={{ fontSize: 13, color: "#666", display: "block", marginBottom: 4 }}>참고 사진</label>
+                <label style={{ fontSize: 13, color: colors.textSecondary, display: "block", marginBottom: 4 }}>참고 사진</label>
                 {mode === "edit" && editingActivity?.materialPhotoFilename && !draft.removeMaterialPhoto && (
-                  <div style={{ fontSize: 13, marginBottom: 4 }}>
+                  <div style={{ fontSize: 13, marginBottom: 4, color: colors.navy }}>
                     현재: {editingActivity.materialPhotoFilename}{" "}
-                    <button type="button" onClick={() => setDraft({ ...draft, removeMaterialPhoto: true })} style={{ fontSize: 12, padding: "2px 6px" }}>
+                    <button type="button" onClick={() => setDraft({ ...draft, removeMaterialPhoto: true })} style={{ fontSize: 12, padding: "2px 8px", color: colors.pink, border: `1px solid ${colors.pink}`, borderRadius: 6, background: "none", cursor: "pointer" }}>
                       삭제
                     </button>
                   </div>
@@ -334,11 +368,11 @@ export default function ActivitiesPage() {
                 />
               </div>
               <div>
-                <label style={{ fontSize: 13, color: "#666", display: "block", marginBottom: 4 }}>참고 파일</label>
+                <label style={{ fontSize: 13, color: colors.textSecondary, display: "block", marginBottom: 4 }}>참고 파일</label>
                 {mode === "edit" && editingActivity?.materialDocFilename && !draft.removeMaterialDoc && (
-                  <div style={{ fontSize: 13, marginBottom: 4 }}>
+                  <div style={{ fontSize: 13, marginBottom: 4, color: colors.navy }}>
                     현재: {editingActivity.materialDocFilename}{" "}
-                    <button type="button" onClick={() => setDraft({ ...draft, removeMaterialDoc: true })} style={{ fontSize: 12, padding: "2px 6px" }}>
+                    <button type="button" onClick={() => setDraft({ ...draft, removeMaterialDoc: true })} style={{ fontSize: 12, padding: "2px 8px", color: colors.pink, border: `1px solid ${colors.pink}`, borderRadius: 6, background: "none", cursor: "pointer" }}>
                       삭제
                     </button>
                   </div>
@@ -351,19 +385,19 @@ export default function ActivitiesPage() {
             </div>
           </div>
 
-          {msg && <p style={{ fontSize: 13, color: "crimson" }}>{msg}</p>}
+          {msg && <p style={{ fontSize: 13, color: colors.pink }}>{msg}</p>}
 
-          <button type="submit" disabled={saving} style={{ padding: 14, fontSize: 16, background: "#222", color: "#fff", border: "none", borderRadius: 8 }}>
+          <button type="submit" disabled={saving} style={primaryBtn}>
             {saving ? "저장 중..." : "저장"}
           </button>
-          <button type="button" onClick={cancel} style={{ padding: 10, fontSize: 14 }}>
+          <button type="button" onClick={cancel} style={secondaryBtn}>
             취소
           </button>
           {mode === "edit" && (
             <button
               type="button"
               onClick={() => handleDelete(editingId)}
-              style={{ padding: 10, fontSize: 14, color: "#c0392b", border: "1px solid #c0392b", borderRadius: 8, background: "none" }}
+              style={{ padding: 12, fontSize: 14, fontWeight: 700, color: colors.pink, border: `1px solid ${colors.pink}`, borderRadius: 10, background: "none", cursor: "pointer" }}
             >
               활동 삭제
             </button>
@@ -374,9 +408,9 @@ export default function ActivitiesPage() {
   }
 
   return (
-    <div style={{ maxWidth: 560, margin: "24px auto", padding: 16, fontFamily: "sans-serif" }}>
-      <h1 style={{ fontSize: 20, marginBottom: 16 }}>활동 만들기</h1>
-      {activities.length === 0 && <p style={{ color: "#888" }}>아직 생성된 활동이 없습니다.</p>}
+    <div style={{ maxWidth: 560, margin: "24px auto", padding: 16, fontFamily }}>
+      <h1 style={{ fontSize: 20, fontWeight: 800, marginBottom: 16, color: colors.navy }}>활동 만들기</h1>
+      {activities.length === 0 && <p style={{ color: colors.textSecondary }}>아직 생성된 활동이 없습니다.</p>}
       <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 16 }}>
         {activities.map((a) => {
           const tags = [
@@ -398,15 +432,15 @@ export default function ActivitiesPage() {
             <button
               key={a.activityId}
               onClick={() => startEdit(a)}
-              style={{ textAlign: "left", padding: "10px 12px", display: "flex", justifyContent: "space-between", alignItems: "center" }}
+              style={{ textAlign: "left", ...card, padding: "12px 14px", display: "flex", justifyContent: "space-between", alignItems: "center", cursor: "pointer" }}
             >
-              <span style={{ fontSize: 14, fontWeight: 500 }}>{a.name}</span>
+              <span style={{ fontSize: 14, fontWeight: 700, color: colors.navy }}>{a.name}</span>
               <span style={{ fontSize: 13 }}>{tags}</span>
             </button>
           );
         })}
       </div>
-      <button onClick={startAdd} style={{ width: "100%", padding: 12, fontSize: 15 }}>
+      <button onClick={startAdd} style={{ ...primaryBtn, width: "100%" }}>
         + 활동추가
       </button>
     </div>
