@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { colors, fontFamily } from "../theme";
 
 type Student = { studentId: string; name: string; studentStatus: string };
 type Template = { templateId: string; name: string; items: { templateItemId: string }[] };
@@ -27,6 +28,74 @@ type AssignedItem = {
 };
 type Assignment = { assignmentId: string; items: AssignedItem[] };
 type TodayData = { assignments: Assignment[]; progress: number };
+
+const card: React.CSSProperties = {
+  background: colors.card,
+  borderRadius: 16,
+  boxShadow: "0 2px 10px rgba(21,42,84,0.05)",
+};
+const box: React.CSSProperties = {
+  padding: "12px 14px",
+  fontSize: 15,
+  width: "100%",
+  boxSizing: "border-box",
+  borderRadius: 10,
+  border: `1px solid ${colors.border}`,
+  fontFamily,
+};
+const primaryBtn: React.CSSProperties = {
+  padding: "13px 18px",
+  fontSize: 15,
+  fontWeight: 700,
+  color: "#fff",
+  background: colors.blueGradient,
+  border: "none",
+  borderRadius: 10,
+  cursor: "pointer",
+};
+const smallGhostBtn: React.CSSProperties = {
+  fontSize: 12,
+  padding: "5px 10px",
+  color: colors.blue,
+  background: colors.blueLight,
+  border: "none",
+  borderRadius: 8,
+  cursor: "pointer",
+};
+const smallDangerBtn: React.CSSProperties = {
+  fontSize: 12,
+  padding: "5px 10px",
+  color: colors.pink,
+  background: "none",
+  border: `1px solid ${colors.pink}`,
+  borderRadius: 8,
+  cursor: "pointer",
+};
+
+function UploaderShell(props: {
+  fileInput: React.ReactNode;
+  onView: () => void;
+  onDelete: () => void;
+  uploading: boolean;
+  msg: string;
+  children?: React.ReactNode;
+}) {
+  return (
+    <div style={{ marginBottom: 8 }}>
+      <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
+        {props.fileInput}
+        <button type="button" onClick={props.onView} style={smallGhostBtn}>
+          파일 보기
+        </button>
+        <button type="button" onClick={props.onDelete} disabled={props.uploading} style={smallDangerBtn}>
+          삭제
+        </button>
+        {props.msg && <span style={{ fontSize: 12, color: colors.textSecondary }}>{props.msg}</span>}
+      </div>
+      {props.children}
+    </div>
+  );
+}
 
 function PhotoUploader(props: { assignedItemId: string; onDone: () => void }) {
   const [uploading, setUploading] = useState(false);
@@ -93,24 +162,22 @@ function PhotoUploader(props: { assignedItemId: string; onDone: () => void }) {
   }
 
   return (
-    <div style={{ marginBottom: 6 }}>
-      <input type="file" accept="image/*,application/pdf" onChange={handleFile} disabled={uploading} />
-      <button type="button" onClick={handleView} style={{ marginLeft: 8, padding: "4px 10px" }}>
-        파일 보기
-      </button>
-      <button type="button" onClick={handleDelete} disabled={uploading} style={{ marginLeft: 8, padding: "4px 10px", color: "#c0392b" }}>
-        삭제
-      </button>
-      {msg && <span style={{ marginLeft: 8, fontSize: 13 }}>{msg}</span>}
+    <UploaderShell
+      fileInput={<input type="file" accept="image/*,application/pdf" onChange={handleFile} disabled={uploading} />}
+      onView={handleView}
+      onDelete={handleDelete}
+      uploading={uploading}
+      msg={msg}
+    >
       {viewUrl && viewMimeType === "application/pdf" && (
         <div style={{ marginTop: 6 }}>
           <iframe
             src={viewUrl}
             title={viewFilename || "제출 PDF"}
-            style={{ width: "100%", height: 500, border: "1px solid #ddd", borderRadius: 8 }}
+            style={{ width: "100%", height: 500, border: `1px solid ${colors.border}`, borderRadius: 10 }}
           />
           <div style={{ marginTop: 4 }}>
-            <a href={viewUrl} target="_blank" rel="noreferrer" style={{ fontSize: 13 }}>
+            <a href={viewUrl} target="_blank" rel="noreferrer" style={{ fontSize: 13, color: colors.blue }}>
               📄 {viewFilename || "새 창에서 크게 보기"}
             </a>
           </div>
@@ -118,10 +185,10 @@ function PhotoUploader(props: { assignedItemId: string; onDone: () => void }) {
       )}
       {viewUrl && viewMimeType !== "application/pdf" && (
         <div style={{ marginTop: 6 }}>
-          <img src={viewUrl} alt="제출 사진" style={{ maxWidth: "100%", borderRadius: 8 }} />
+          <img src={viewUrl} alt="제출 사진" style={{ maxWidth: "100%", borderRadius: 10 }} />
         </div>
       )}
-    </div>
+    </UploaderShell>
   );
 }
 
@@ -187,22 +254,20 @@ function AudioUploader(props: { assignedItemId: string; onDone: () => void }) {
   }
 
   return (
-    <div style={{ marginBottom: 6 }}>
-      <input type="file" accept="audio/*" onChange={handleFile} disabled={uploading} />
-      <button type="button" onClick={handleView} style={{ marginLeft: 8, padding: "4px 10px" }}>
-        파일 보기
-      </button>
-      <button type="button" onClick={handleDelete} disabled={uploading} style={{ marginLeft: 8, padding: "4px 10px", color: "#c0392b" }}>
-        삭제
-      </button>
-      {msg && <span style={{ marginLeft: 8, fontSize: 13 }}>{msg}</span>}
+    <UploaderShell
+      fileInput={<input type="file" accept="audio/*" onChange={handleFile} disabled={uploading} />}
+      onView={handleView}
+      onDelete={handleDelete}
+      uploading={uploading}
+      msg={msg}
+    >
       {viewUrl && (
         <div style={{ marginTop: 6 }}>
           <audio controls src={viewUrl} style={{ width: "100%" }} />
-          {viewFilename && <div style={{ fontSize: 12, color: "#888", marginTop: 2 }}>{viewFilename}</div>}
+          {viewFilename && <div style={{ fontSize: 12, color: colors.textMuted, marginTop: 2 }}>{viewFilename}</div>}
         </div>
       )}
-    </div>
+    </UploaderShell>
   );
 }
 
@@ -268,22 +333,20 @@ function VideoUploader(props: { assignedItemId: string; onDone: () => void }) {
   }
 
   return (
-    <div style={{ marginBottom: 6 }}>
-      <input type="file" accept="video/*" onChange={handleFile} disabled={uploading} />
-      <button type="button" onClick={handleView} style={{ marginLeft: 8, padding: "4px 10px" }}>
-        파일 보기
-      </button>
-      <button type="button" onClick={handleDelete} disabled={uploading} style={{ marginLeft: 8, padding: "4px 10px", color: "#c0392b" }}>
-        삭제
-      </button>
-      {msg && <span style={{ marginLeft: 8, fontSize: 13 }}>{msg}</span>}
+    <UploaderShell
+      fileInput={<input type="file" accept="video/*" onChange={handleFile} disabled={uploading} />}
+      onView={handleView}
+      onDelete={handleDelete}
+      uploading={uploading}
+      msg={msg}
+    >
       {viewUrl && (
         <div style={{ marginTop: 6 }}>
-          <video controls src={viewUrl} style={{ width: "100%", maxHeight: 400, borderRadius: 8 }} />
-          {viewFilename && <div style={{ fontSize: 12, color: "#888", marginTop: 2 }}>{viewFilename}</div>}
+          <video controls src={viewUrl} style={{ width: "100%", maxHeight: 400, borderRadius: 10 }} />
+          {viewFilename && <div style={{ fontSize: 12, color: colors.textMuted, marginTop: 2 }}>{viewFilename}</div>}
         </div>
       )}
-    </div>
+    </UploaderShell>
   );
 }
 
@@ -349,23 +412,21 @@ function FileUploader(props: { assignedItemId: string; onDone: () => void }) {
   }
 
   return (
-    <div style={{ marginBottom: 6 }}>
-      <input type="file" onChange={handleFile} disabled={uploading} />
-      <button type="button" onClick={handleView} style={{ marginLeft: 8, padding: "4px 10px" }}>
-        파일 보기
-      </button>
-      <button type="button" onClick={handleDelete} disabled={uploading} style={{ marginLeft: 8, padding: "4px 10px", color: "#c0392b" }}>
-        삭제
-      </button>
-      {msg && <span style={{ marginLeft: 8, fontSize: 13 }}>{msg}</span>}
+    <UploaderShell
+      fileInput={<input type="file" onChange={handleFile} disabled={uploading} />}
+      onView={handleView}
+      onDelete={handleDelete}
+      uploading={uploading}
+      msg={msg}
+    >
       {viewUrl && (
         <div style={{ marginTop: 6 }}>
-          <a href={viewUrl} target="_blank" rel="noreferrer">
+          <a href={viewUrl} target="_blank" rel="noreferrer" style={{ color: colors.blue }}>
             📎 {viewFilename || "제출 파일 열기/다운로드"}
           </a>
         </div>
       )}
-    </div>
+    </UploaderShell>
   );
 }
 
@@ -542,17 +603,10 @@ export default function ChecklistTestPage() {
   // 퇴원 처리된 학생은 배정/조회 대상에서 제외한다.
   const activeStudents = students.filter((s) => s.studentStatus !== "withdrawn");
 
-  const box: React.CSSProperties = {
-    padding: 10,
-    fontSize: 16,
-    width: "100%",
-    boxSizing: "border-box",
-  };
-
   if (!loggedIn) {
     return (
-      <div style={{ maxWidth: 420, margin: "40px auto", padding: 16, fontFamily: "sans-serif" }}>
-        <h1 style={{ fontSize: 20, marginBottom: 16 }}>관리자 로그인</h1>
+      <div style={{ maxWidth: 420, margin: "40px auto", padding: 16, fontFamily }}>
+        <h1 style={{ fontSize: 20, marginBottom: 16, color: colors.navy }}>관리자 로그인</h1>
         <form onSubmit={handleLogin} style={{ display: "flex", flexDirection: "column", gap: 12 }}>
           <input
             placeholder="아이디"
@@ -567,26 +621,56 @@ export default function ChecklistTestPage() {
             onChange={(e) => setPassword(e.target.value)}
             style={box}
           />
-          <button type="submit" style={{ padding: 12, fontSize: 16 }}>
+          <button type="submit" style={primaryBtn}>
             로그인
           </button>
         </form>
-        {loginMsg && <p style={{ color: "crimson" }}>{loginMsg}</p>}
+        {loginMsg && <p style={{ color: colors.pink }}>{loginMsg}</p>}
       </div>
     );
   }
 
   return (
-    <div style={{ maxWidth: 560, margin: "40px auto", padding: 16, fontFamily: "sans-serif" }}>
-      <h1 style={{ fontSize: 20, marginBottom: 16 }}>체크리스트 배정 / 오늘 확인</h1>
+    <div style={{ maxWidth: 560, margin: "24px auto", padding: 16, fontFamily }}>
+      <h1 style={{ fontSize: 20, fontWeight: 800, marginBottom: 16, color: colors.navy }}>체크리스트 배정 / 오늘 확인</h1>
 
-      <h2 style={{ fontSize: 16, marginBottom: 8 }}>1. 학생에게 배정</h2>
-      <form onSubmit={handleAssign} style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-        <select
-          value={selectedStudentId}
-          onChange={(e) => setSelectedStudentId(e.target.value)}
-          style={box}
-        >
+      <div style={{ ...card, padding: 18, marginBottom: 20 }}>
+        <h2 style={{ fontSize: 15, fontWeight: 800, marginBottom: 10, color: colors.navy }}>1. 학생에게 배정</h2>
+        <form onSubmit={handleAssign} style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          <select
+            value={selectedStudentId}
+            onChange={(e) => setSelectedStudentId(e.target.value)}
+            style={box}
+          >
+            <option value="">학생 선택</option>
+            {activeStudents.map((s) => (
+              <option key={s.studentId} value={s.studentId}>
+                {s.name}
+              </option>
+            ))}
+          </select>
+          <select
+            value={selectedTemplateId}
+            onChange={(e) => setSelectedTemplateId(e.target.value)}
+            style={box}
+          >
+            <option value="">템플릿 선택</option>
+            {templates.map((t) => (
+              <option key={t.templateId} value={t.templateId}>
+                {t.name} ({t.items.length}개 항목)
+              </option>
+            ))}
+          </select>
+          <button type="submit" style={primaryBtn}>
+            오늘 날짜로 배정
+          </button>
+        </form>
+        {assignMsg && <p style={{ fontSize: 13, color: colors.blue, marginTop: 8 }}>{assignMsg}</p>}
+      </div>
+
+      <div style={{ ...card, padding: 18, marginBottom: 20 }}>
+        <h2 style={{ fontSize: 15, fontWeight: 800, marginBottom: 10, color: colors.navy }}>2. 오늘 체크리스트 보기</h2>
+        <select value={viewStudentId} onChange={(e) => setViewStudentId(e.target.value)} style={box}>
           <option value="">학생 선택</option>
           {activeStudents.map((s) => (
             <option key={s.studentId} value={s.studentId}>
@@ -594,83 +678,57 @@ export default function ChecklistTestPage() {
             </option>
           ))}
         </select>
-        <select
-          value={selectedTemplateId}
-          onChange={(e) => setSelectedTemplateId(e.target.value)}
-          style={box}
+
+        <button
+          type="button"
+          onClick={handleCreateShareLink}
+          style={{ marginTop: 10, ...smallGhostBtn, padding: "9px 14px", fontSize: 13, fontWeight: 700 }}
         >
-          <option value="">템플릿 선택</option>
-          {templates.map((t) => (
-            <option key={t.templateId} value={t.templateId}>
-              {t.name} ({t.items.length}개 항목)
-            </option>
-          ))}
-        </select>
-        <button type="submit" style={{ padding: 12, fontSize: 16 }}>
-          오늘 날짜로 배정
+          학부모 공유링크 만들기 (오늘 날짜)
         </button>
-      </form>
-      {assignMsg && <p style={{ fontSize: 14 }}>{assignMsg}</p>}
-
-      <h2 style={{ fontSize: 16, marginTop: 28, marginBottom: 8 }}>2. 오늘 체크리스트 보기</h2>
-      <select value={viewStudentId} onChange={(e) => setViewStudentId(e.target.value)} style={box}>
-        <option value="">학생 선택</option>
-        {activeStudents.map((s) => (
-          <option key={s.studentId} value={s.studentId}>
-            {s.name}
-          </option>
-        ))}
-      </select>
-
-      <button
-        type="button"
-        onClick={handleCreateShareLink}
-        style={{ marginTop: 8, padding: "8px 12px", fontSize: 14 }}
-      >
-        학부모 공유링크 만들기 (오늘 날짜)
-      </button>
-      {shareLinkMsg && <p style={{ fontSize: 13, marginTop: 6 }}>{shareLinkMsg}</p>}
-      {shareLinkUrl && (
-        <input
-          readOnly
-          value={shareLinkUrl}
-          onFocus={(e) => e.target.select()}
-          style={{ ...box, marginTop: 6, fontSize: 13 }}
-        />
-      )}
+        {shareLinkMsg && <p style={{ fontSize: 13, marginTop: 6, color: colors.textSecondary }}>{shareLinkMsg}</p>}
+        {shareLinkUrl && (
+          <input
+            readOnly
+            value={shareLinkUrl}
+            onFocus={(e) => e.target.select()}
+            style={{ ...box, marginTop: 6, fontSize: 13 }}
+          />
+        )}
+      </div>
 
       {todayData && (
-        <div style={{ marginTop: 16 }}>
+        <div>
           <div
             style={{
-              background: "#eee",
+              background: colors.blueLight,
               borderRadius: 8,
               overflow: "hidden",
-              height: 20,
+              height: 16,
               marginBottom: 8,
             }}
           >
             <div
               style={{
                 width: todayData.progress + "%",
-                background: "#4caf50",
+                background: colors.blueGradient,
                 height: "100%",
               }}
             />
           </div>
-          <p style={{ fontSize: 14, marginBottom: 16 }}>진행률 {todayData.progress}%</p>
+          <p style={{ fontSize: 14, marginBottom: 16, color: colors.navy, fontWeight: 600 }}>진행률 {todayData.progress}%</p>
 
           {todayData.assignments.length === 0 && (
-            <p style={{ color: "#888" }}>오늘 배정된 체크리스트가 없습니다.</p>
+            <p style={{ color: colors.textSecondary }}>오늘 배정된 체크리스트가 없습니다.</p>
           )}
 
           {todayData.assignments.map((a) => (
             <div key={a.assignmentId} style={{ marginBottom: 20 }}>
-              <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 6 }}>
+              <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 8 }}>
                 <button
                   type="button"
                   onClick={() => handleDeleteAssignment(a.assignmentId)}
-                  style={{ fontSize: 12, padding: "3px 8px", color: "#c0392b", background: "none", border: "1px solid #c0392b", borderRadius: 4 }}
+                  style={smallDangerBtn}
                 >
                   이 배정 전체 삭제
                 </button>
@@ -679,29 +737,28 @@ export default function ChecklistTestPage() {
                 <div
                   key={item.assignedItemId}
                   style={{
-                    border: "1px solid #eee",
-                    borderRadius: 8,
-                    padding: 12,
+                    ...card,
+                    padding: 16,
                     marginBottom: 10,
-                    background: item.completed ? "#f3fbf3" : "white",
+                    background: item.completed ? colors.greenLight : colors.card,
                   }}
                 >
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-                    <div style={{ fontSize: 16, fontWeight: 600 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+                    <div style={{ fontSize: 16, fontWeight: 700, color: colors.navy }}>
                       {item.completed ? "✅ " : "⬜ "}
                       {item.title}
                     </div>
                     <button
                       type="button"
                       onClick={() => resetItem(item)}
-                      style={{ fontSize: 12, padding: "3px 8px", color: "#c0392b", background: "none", border: "1px solid #c0392b", borderRadius: 4 }}
+                      style={smallDangerBtn}
                     >
                       초기화
                     </button>
                   </div>
 
                   {item.hasCheck && (
-                    <label style={{ display: "block", marginBottom: 6 }}>
+                    <label style={{ display: "flex", alignItems: "center", marginBottom: 8, fontSize: 14, color: colors.navy }}>
                       <input
                         type="checkbox"
                         checked={item.checked}
@@ -715,7 +772,7 @@ export default function ChecklistTestPage() {
                   )}
 
                   {item.hasCount && (
-                    <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
                       <button
                         type="button"
                         onClick={() =>
@@ -724,11 +781,11 @@ export default function ChecklistTestPage() {
                           })
                         }
                         disabled={item.currentCount <= 0}
-                        style={{ padding: "4px 12px" }}
+                        style={{ padding: "6px 14px", borderRadius: 8, border: `1px solid ${colors.border}`, background: colors.bg, cursor: "pointer" }}
                       >
                         -
                       </button>
-                      <span>
+                      <span style={{ color: colors.navy, fontWeight: 600 }}>
                         {item.currentCount} / {item.targetCount}회
                       </span>
                       <button
@@ -738,7 +795,7 @@ export default function ChecklistTestPage() {
                             currentCount: item.currentCount + 1,
                           })
                         }
-                        style={{ padding: "4px 12px" }}
+                        style={{ padding: "6px 14px", borderRadius: 8, border: "none", background: colors.blue, color: "#fff", cursor: "pointer" }}
                       >
                         +
                       </button>
@@ -746,7 +803,7 @@ export default function ChecklistTestPage() {
                   )}
 
                   {item.hasScore && (
-                    <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
                       <input
                         type="number"
                         placeholder="점수"
@@ -756,24 +813,24 @@ export default function ChecklistTestPage() {
                             score: e.target.value === "" ? null : Number(e.target.value),
                           })
                         }
-                        style={{ width: 80, padding: 6 }}
+                        style={{ width: 80, padding: 8, borderRadius: 8, border: `1px solid ${colors.border}` }}
                       />
-                      <span>/ {item.maxScore}점</span>
+                      <span style={{ color: colors.textSecondary }}>/ {item.maxScore}점</span>
                     </div>
                   )}
 
                   {item.linkUrl && (
-                    <a href={item.linkUrl} target="_blank" rel="noreferrer" style={{ display: "inline-block", marginBottom: 6 }}>
+                    <a href={item.linkUrl} target="_blank" rel="noreferrer" style={{ display: "inline-block", marginBottom: 8, color: colors.blue, fontSize: 13 }}>
                       🔗 {item.linkLabel || "자료 열기"}
                     </a>
                   )}
 
                   {item.teachingVideo && (
-                    <div style={{ marginBottom: 8 }}>
-                      <div style={{ fontSize: 13, color: "#555", marginBottom: 4 }}>
+                    <div style={{ marginBottom: 10 }}>
+                      <div style={{ fontSize: 13, color: colors.textSecondary, marginBottom: 4 }}>
                         🎓 학습영상: {item.teachingVideo.title}
                       </div>
-                      <video controls src={item.teachingVideo.url} style={{ width: "100%", maxHeight: 360, borderRadius: 8 }} />
+                      <video controls src={item.teachingVideo.url} style={{ width: "100%", maxHeight: 360, borderRadius: 10 }} />
                     </div>
                   )}
 
