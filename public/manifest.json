@@ -2,7 +2,7 @@
   "name": "보스턴영어 체크리스트",
   "short_name": "보스턴영어",
   "description": "매일 조금씩, 영어가 내 것이 되는 시간",
-  "start_url": "/student",
+  "start_url": "/",
   "scope": "/",
   "display": "standalone",
   "background_color": "#F5F7FB",
