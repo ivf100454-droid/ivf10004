@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { colors, fontFamily } from "../theme";
 
 type Activity = {
   activityId: string;
@@ -70,6 +71,41 @@ function itemTags(it: TemplateItem) {
     .filter(Boolean)
     .join(" ");
 }
+
+const card: React.CSSProperties = {
+  background: colors.card,
+  borderRadius: 16,
+  boxShadow: "0 2px 10px rgba(21,42,84,0.05)",
+};
+const box: React.CSSProperties = {
+  padding: "12px 14px",
+  fontSize: 15,
+  width: "100%",
+  boxSizing: "border-box",
+  borderRadius: 10,
+  border: `1px solid ${colors.border}`,
+  fontFamily,
+};
+const primaryBtn: React.CSSProperties = {
+  padding: "13px 18px",
+  fontSize: 15,
+  fontWeight: 700,
+  color: "#fff",
+  background: colors.blueGradient,
+  border: "none",
+  borderRadius: 10,
+  cursor: "pointer",
+};
+const secondaryBtn: React.CSSProperties = {
+  padding: "10px 16px",
+  fontSize: 14,
+  fontWeight: 600,
+  color: colors.textSecondary,
+  background: colors.bg,
+  border: `1px solid ${colors.border}`,
+  borderRadius: 10,
+  cursor: "pointer",
+};
 
 export default function TemplateBuilderPage() {
   const [loggedIn, setLoggedIn] = useState(false);
@@ -189,20 +225,18 @@ export default function TemplateBuilderPage() {
     }
   }
 
-  const box: React.CSSProperties = { padding: 10, fontSize: 15, width: "100%", boxSizing: "border-box" };
-
   if (!loggedIn) {
     return (
-      <div style={{ maxWidth: 420, margin: "40px auto", padding: 16, fontFamily: "sans-serif" }}>
-        <h1 style={{ fontSize: 20, marginBottom: 16 }}>관리자 로그인</h1>
+      <div style={{ maxWidth: 420, margin: "40px auto", padding: 16, fontFamily }}>
+        <h1 style={{ fontSize: 20, marginBottom: 16, color: colors.navy }}>관리자 로그인</h1>
         <form onSubmit={handleLogin} style={{ display: "flex", flexDirection: "column", gap: 12 }}>
           <input placeholder="아이디" value={loginId} onChange={(e) => setLoginId(e.target.value)} style={box} />
           <input placeholder="비밀번호" type="password" value={password} onChange={(e) => setPassword(e.target.value)} style={box} />
-          <button type="submit" style={{ padding: 12, fontSize: 16 }}>
+          <button type="submit" style={primaryBtn}>
             로그인
           </button>
         </form>
-        {loginMsg && <p style={{ color: "crimson" }}>{loginMsg}</p>}
+        {loginMsg && <p style={{ color: colors.pink }}>{loginMsg}</p>}
       </div>
     );
   }
@@ -212,8 +246,8 @@ export default function TemplateBuilderPage() {
     const available = activities.filter((a) => pickedIds.indexOf(a.activityId) === -1);
 
     return (
-      <div style={{ maxWidth: 560, margin: "24px auto", padding: 16, fontFamily: "sans-serif" }}>
-        <h1 style={{ fontSize: 20, marginBottom: 16 }}>{editingId ? "템플릿 수정" : "체크리스트 템플릿 생성"}</h1>
+      <div style={{ maxWidth: 560, margin: "24px auto", padding: 16, fontFamily }}>
+        <h1 style={{ fontSize: 20, fontWeight: 800, marginBottom: 16, color: colors.navy }}>{editingId ? "템플릿 수정" : "체크리스트 템플릿 생성"}</h1>
 
         <input
           placeholder="템플릿 이름 (예: 기본 체크리스트)"
@@ -227,12 +261,12 @@ export default function TemplateBuilderPage() {
             {chosen.map((a) => (
               <div
                 key={a.activityId}
-                style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "#eef6ff", borderRadius: 8, padding: "8px 12px" }}
+                style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: colors.blueLight, borderRadius: 10, padding: "10px 14px" }}
               >
-                <span style={{ fontSize: 14 }}>
-                  {a.name} <span style={{ fontSize: 12 }}>{activityTags(a)}</span>
+                <span style={{ fontSize: 14, color: colors.navy, fontWeight: 600 }}>
+                  {a.name} <span style={{ fontSize: 12, fontWeight: 400 }}>{activityTags(a)}</span>
                 </span>
-                <button type="button" onClick={() => removeActivity(a.activityId)} style={{ fontSize: 12, padding: "2px 8px" }}>
+                <button type="button" onClick={() => removeActivity(a.activityId)} style={{ fontSize: 12, padding: "4px 10px", color: colors.blue, background: colors.card, border: "none", borderRadius: 8, cursor: "pointer" }}>
                   빼기
                 </button>
               </div>
@@ -241,21 +275,21 @@ export default function TemplateBuilderPage() {
         )}
 
         {activities.length === 0 && (
-          <p style={{ fontSize: 13, color: "#888", marginBottom: 16 }}>
+          <p style={{ fontSize: 13, color: colors.textSecondary, marginBottom: 16 }}>
             아직 생성된 활동이 없습니다. "활동 만들기" 화면에서 먼저 만들어주세요.
           </p>
         )}
         {activities.length > 0 && available.length > 0 && (
           <div style={{ marginBottom: 16 }}>
-            <p style={{ fontSize: 14, fontWeight: 600, marginBottom: 8 }}>체크리스트 추가하기</p>
+            <p style={{ fontSize: 14, fontWeight: 700, marginBottom: 8, color: colors.navy }}>체크리스트 추가하기</p>
             <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
               {available.map((a) => (
                 <button
                   key={a.activityId}
                   onClick={() => addActivity(a.activityId)}
-                  style={{ textAlign: "left", padding: "10px 12px", display: "flex", justifyContent: "space-between", alignItems: "center" }}
+                  style={{ textAlign: "left", ...card, padding: "10px 12px", display: "flex", justifyContent: "space-between", alignItems: "center", cursor: "pointer" }}
                 >
-                  <span style={{ fontSize: 14 }}>{a.name}</span>
+                  <span style={{ fontSize: 14, color: colors.navy }}>{a.name}</span>
                   <span style={{ fontSize: 12 }}>{activityTags(a)}</span>
                 </button>
               ))}
@@ -263,22 +297,18 @@ export default function TemplateBuilderPage() {
           </div>
         )}
 
-        {msg && <p style={{ fontSize: 13, color: "crimson", marginBottom: 8 }}>{msg}</p>}
+        {msg && <p style={{ fontSize: 13, color: colors.pink, marginBottom: 8 }}>{msg}</p>}
 
-        <button
-          onClick={handleSave}
-          disabled={saving}
-          style={{ width: "100%", padding: 14, fontSize: 16, background: "#222", color: "#fff", border: "none", borderRadius: 8, marginBottom: 8 }}
-        >
+        <button onClick={handleSave} disabled={saving} style={{ ...primaryBtn, width: "100%", marginBottom: 8 }}>
           {saving ? "저장 중..." : "저장"}
         </button>
-        <button onClick={cancel} style={{ width: "100%", padding: 10, fontSize: 14, marginBottom: 8 }}>
+        <button onClick={cancel} style={{ ...secondaryBtn, width: "100%", marginBottom: 8 }}>
           취소
         </button>
         {editingId && (
           <button
             onClick={() => handleDelete(editingId)}
-            style={{ width: "100%", padding: 10, fontSize: 14, color: "#c0392b", border: "1px solid #c0392b", borderRadius: 8, background: "none" }}
+            style={{ width: "100%", padding: 12, fontSize: 14, fontWeight: 700, color: colors.pink, border: `1px solid ${colors.pink}`, borderRadius: 10, background: "none", cursor: "pointer" }}
           >
             템플릿 삭제
           </button>
@@ -288,20 +318,20 @@ export default function TemplateBuilderPage() {
   }
 
   return (
-    <div style={{ maxWidth: 560, margin: "24px auto", padding: 16, fontFamily: "sans-serif" }}>
-      <h1 style={{ fontSize: 20, marginBottom: 16 }}>체크리스트 템플릿 생성</h1>
-      {templates.length === 0 && <p style={{ color: "#888" }}>아직 생성된 템플릿이 없습니다.</p>}
+    <div style={{ maxWidth: 560, margin: "24px auto", padding: 16, fontFamily }}>
+      <h1 style={{ fontSize: 20, fontWeight: 800, marginBottom: 16, color: colors.navy }}>체크리스트 템플릿 생성</h1>
+      {templates.length === 0 && <p style={{ color: colors.textSecondary }}>아직 생성된 템플릿이 없습니다.</p>}
       <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 16 }}>
         {templates.map((t) => (
-          <button key={t.templateId} onClick={() => startEdit(t)} style={{ textAlign: "left", padding: "10px 12px" }}>
-            <div style={{ fontSize: 14, fontWeight: 500 }}>{t.name}</div>
-            <div style={{ fontSize: 12, color: "#888" }}>
+          <button key={t.templateId} onClick={() => startEdit(t)} style={{ textAlign: "left", ...card, padding: "12px 14px", cursor: "pointer" }}>
+            <div style={{ fontSize: 14, fontWeight: 700, color: colors.navy }}>{t.name}</div>
+            <div style={{ fontSize: 12, color: colors.textSecondary, marginTop: 2 }}>
               {t.items.map((it) => it.title + " " + itemTags(it)).join(" · ")}
             </div>
           </button>
         ))}
       </div>
-      <button onClick={startNew} style={{ width: "100%", padding: 12, fontSize: 15 }}>
+      <button onClick={startNew} style={{ ...primaryBtn, width: "100%" }}>
         + 체크리스트 추가하기
       </button>
     </div>
