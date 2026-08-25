@@ -31,6 +31,7 @@ export async function GET(req: NextRequest, { params }: { params: { token: strin
           photoSubmissions: { where: { status: "current" }, include: { file: true } },
           audioSubmissions: { where: { status: "current" }, include: { file: true } },
           videoSubmissions: { where: { status: "current" }, include: { file: true } },
+          fileSubmissions: { where: { status: "current" }, include: { file: true } },
         },
       },
     },
@@ -56,6 +57,7 @@ export async function GET(req: NextRequest, { params }: { params: { token: strin
           const photo = item.photoSubmissions[0];
           const audio = item.audioSubmissions[0];
           const video = item.videoSubmissions[0];
+          const file = item.fileSubmissions[0];
 
           return {
             assignedItemId: item.assignedItemId,
@@ -73,6 +75,7 @@ export async function GET(req: NextRequest, { params }: { params: { token: strin
             hasPhotoSubmission: item.hasPhotoSubmission,
             hasAudioSubmission: item.hasAudioSubmission,
             hasVideoSubmission: item.hasVideoSubmission,
+            hasFileSubmission: item.hasFileSubmission,
             completed: item.completed,
             photoUrl: photo ? await getSignedDownloadUrl(photo.file.storageKey, 600) : null,
             photoMimeType: photo ? photo.file.mimeType : null,
@@ -81,6 +84,9 @@ export async function GET(req: NextRequest, { params }: { params: { token: strin
             audioFilename: audio ? audio.file.originalFilename : null,
             videoUrl: video ? await getSignedDownloadUrl(video.file.storageKey, 600) : null,
             videoFilename: video ? video.file.originalFilename : null,
+            fileUrl: file ? await getSignedDownloadUrl(file.file.storageKey, 600) : null,
+            fileMimeType: file ? file.file.mimeType : null,
+            fileFilename: file ? file.file.originalFilename : null,
           };
         })
       );
