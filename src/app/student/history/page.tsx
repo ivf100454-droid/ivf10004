@@ -24,14 +24,17 @@ type DailyRecord = {
   avgScorePct: number | null;
   items: DailyItem[];
 };
-type WeekStripDay = { date: string; allDone: boolean; hasData: boolean };
+type CalendarDay = { day: number; progress: number };
 type HistoryData = {
-  weekStrip: WeekStripDay[];
-  weekSummary: { completedCount: number; totalCount: number; avgScorePct: number | null };
+  year: number;
+  month: number;
+  days: CalendarDay[];
+  monthSummary: { completedCount: number; totalCount: number; avgScorePct: number | null };
   dailyRecords: DailyRecord[];
 };
 
 const dayLabels = ["일", "월", "화", "수", "목", "금", "토"];
+const MONTH_NAMES = ["1월", "2월", "3월", "4월", "5월", "6월", "7월", "8월", "9월", "10월", "11월", "12월"];
 
 function formatDateLabel(dateStr: string) {
   const d = new Date(dateStr + "T00:00:00Z");
@@ -39,18 +42,59 @@ function formatDateLabel(dateStr: string) {
   return `${d.getUTCFullYear()}년 ${d.getUTCMonth() + 1}월 ${d.getUTCDate()}일 (${dow})`;
 }
 
+function pad2(n: number) {
+  return n < 10 ? "0" + n : String(n);
+}
+
 export default function HistoryPage() {
+  const now = new Date();
+  const [year, setYear] = useState(now.getFullYear());
+  const [month, setMonth] = useState(now.getMonth() + 1);
   const [data, setData] = useState<HistoryData | null>(null);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
 
+  async function load(y: number, m: number) {
+    const res = await fetch(`/api/student/history?year=${y}&month=${m}`);
+    if (!res.ok) return;
+    const d: HistoryData = await res.json();
+    setData(d);
+    setSelectedDate(null);
+  }
+
   useEffect(() => {
-    fetch("/api/student/history?days=14")
-      .then((r) => (r.ok ? r.json() : null))
-      .then((d: HistoryData | null) => {
-        setData(d);
-        if (d && d.weekStrip.length) setSelectedDate(d.weekStrip[d.weekStrip.length - 1].date);
-      });
-  }, []);
+    load(year, month);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [year, month]);
+
+  function navMonth(delta: number) {
+    let y = year;
+    let m = month + delta;
+    if (m < 1) {
+      m = 12;
+      y -= 1;
+    } else if (m > 12) {
+      m = 1;
+      y += 1;
+    }
+    setYear(y);
+    setMonth(m);
+  }
+
+  const progressByDay: Record<number, number> = {};
+  (data?.days || []).forEach((d) => {
+    progressByDay[d.day] = d.progress;
+  });
+
+  const firstDay = new Date(year, month - 1, 1).getDay();
+  const daysInMonth = new Date(year, month, 0).getDate();
+  const cells: (number | null)[] = [];
+  for (let i = 0; i < firstDay; i++) cells.push(null);
+  for (let d = 1; d <= daysInMonth; d++) cells.push(d);
+
+  function openDay(d: number) {
+    const dateStr = `${year}-${pad2(month)}-${pad2(d)}`;
+    setSelectedDate((prev) => (prev === dateStr ? null : dateStr));
+  }
 
   const visibleRecords = selectedDate
     ? data?.dailyRecords.filter((r) => r.date === selectedDate) || []
@@ -78,90 +122,129 @@ export default function HistoryPage() {
           <div style={{ display: "flex", alignItems: "center", gap: 14, marginBottom: 16 }}>
             <div style={{ fontSize: 36 }}>🐻</div>
             <div>
-              <div style={{ fontSize: 13, fontWeight: 700, color: colors.textSecondary }}>이번 주 학습 요약</div>
-              {data && data.weekStrip.length > 0 && (
-                <div style={{ fontSize: 12, color: colors.textMuted, marginTop: 2 }}>
-                  {data.weekStrip[0].date} ~ {data.weekStrip[data.weekStrip.length - 1].date}
-                </div>
-              )}
+              <div style={{ fontSize: 13, fontWeight: 700, color: colors.textSecondary }}>
+                {year}년 {MONTH_NAMES[month - 1]} 학습 요약
+              </div>
+              <div style={{ fontSize: 12, color: colors.textMuted, marginTop: 2 }}>
+                {year}-{pad2(month)}-01 ~ {year}-{pad2(month)}-{pad2(daysInMonth)}
+              </div>
             </div>
           </div>
           <div style={{ display: "flex", justifyContent: "space-around", textAlign: "center" }}>
             <div>
               <div style={{ fontSize: 18 }}>📅</div>
               <div style={{ fontSize: 16, fontWeight: 800, color: colors.navy, marginTop: 4 }}>
-                {data?.weekSummary.completedCount ?? 0} / {data?.weekSummary.totalCount ?? 0}
+                {data?.monthSummary.completedCount ?? 0} / {data?.monthSummary.totalCount ?? 0}
               </div>
               <div style={{ fontSize: 11, color: colors.textSecondary }}>완료한 과제</div>
             </div>
             <div>
               <div style={{ fontSize: 18 }}>🎯</div>
               <div style={{ fontSize: 16, fontWeight: 800, color: colors.navy, marginTop: 4 }}>
-                {data?.weekSummary.avgScorePct != null ? `${data.weekSummary.avgScorePct}%` : "-"}
+                {data?.monthSummary.avgScorePct != null ? `${data.monthSummary.avgScorePct}%` : "-"}
               </div>
               <div style={{ fontSize: 11, color: colors.textSecondary }}>평균 점수</div>
             </div>
           </div>
         </div>
 
-        {data && (
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "space-between",
-              background: colors.card,
-              borderRadius: 16,
-              padding: "14px 8px",
-              marginBottom: 16,
-              boxShadow: "0 2px 10px rgba(21,42,84,0.05)",
-            }}
-          >
-            {data.weekStrip.map((day) => {
-              const d = new Date(day.date + "T00:00:00Z");
-              const active = selectedDate === day.date;
+        <div
+          style={{
+            background: colors.card,
+            borderRadius: 16,
+            padding: 16,
+            marginBottom: 16,
+            boxShadow: "0 2px 10px rgba(21,42,84,0.05)",
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+            <button
+              onClick={() => navMonth(-1)}
+              style={{ padding: "6px 12px", background: colors.bg, border: `1px solid ${colors.border}`, borderRadius: 8, cursor: "pointer" }}
+            >
+              ‹
+            </button>
+            <span style={{ fontSize: 15, fontWeight: 800, color: colors.navy }}>
+              {year}년 {MONTH_NAMES[month - 1]}
+            </span>
+            <button
+              onClick={() => navMonth(1)}
+              style={{ padding: "6px 12px", background: colors.bg, border: `1px solid ${colors.border}`, borderRadius: 8, cursor: "pointer" }}
+            >
+              ›
+            </button>
+          </div>
+
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 4, marginBottom: 4 }}>
+            {dayLabels.map((lbl) => (
+              <div key={lbl} style={{ textAlign: "center", fontSize: 11, color: colors.textMuted, padding: "2px 0" }}>
+                {lbl}
+              </div>
+            ))}
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 4 }}>
+            {cells.map((d, i) => {
+              const progress = d ? progressByDay[d] : undefined;
+              const hasData = progress !== undefined;
+              const dateStr = d ? `${year}-${pad2(month)}-${pad2(d)}` : "";
+              const isSelected = d !== null && selectedDate === dateStr;
               return (
                 <button
-                  key={day.date}
-                  onClick={() => setSelectedDate(day.date)}
+                  key={i}
+                  onClick={() => d && openDay(d)}
+                  disabled={!d}
                   style={{
-                    background: "none",
-                    border: "none",
+                    aspectRatio: "1",
                     display: "flex",
                     flexDirection: "column",
                     alignItems: "center",
-                    gap: 6,
-                    padding: "4px 6px",
-                    borderRadius: 10,
-                    cursor: "pointer",
+                    justifyContent: "center",
+                    borderRadius: "50%",
+                    border: isSelected ? `2px solid ${colors.blue}` : "none",
+                    cursor: d ? "pointer" : "default",
+                    background: hasData ? colors.blueGradient : "transparent",
+                    color: hasData ? "#fff" : colors.navy,
                   }}
                 >
-                  <span style={{ fontSize: 11, color: colors.textMuted }}>{dayLabels[d.getUTCDay()]}</span>
-                  <span
-                    style={{
-                      width: 30,
-                      height: 30,
-                      borderRadius: "50%",
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      fontSize: 12,
-                      fontWeight: 700,
-                      background: active ? colors.blue : day.allDone ? colors.greenLight : colors.bg,
-                      color: active ? "#fff" : day.allDone ? colors.green : colors.textMuted,
-                      border: active ? "none" : `1px solid ${colors.border}`,
-                    }}
-                  >
-                    {day.allDone ? "✓" : d.getUTCDate()}
-                  </span>
+                  {d ? (
+                    hasData ? (
+                      <span style={{ fontSize: 11, fontWeight: 700, lineHeight: 1.1 }}>{progress}%</span>
+                    ) : (
+                      <span style={{ fontSize: 13 }}>{d}</span>
+                    )
+                  ) : (
+                    ""
+                  )}
                 </button>
               );
             })}
           </div>
+        </div>
+
+        {selectedDate && (
+          <button
+            onClick={() => setSelectedDate(null)}
+            style={{
+              display: "block",
+              width: "100%",
+              textAlign: "center",
+              fontSize: 13,
+              color: colors.blue,
+              background: colors.blueLight,
+              border: "none",
+              borderRadius: 10,
+              padding: 10,
+              marginBottom: 12,
+              cursor: "pointer",
+            }}
+          >
+            선택 해제하고 이번 달 전체 보기
+          </button>
         )}
 
         {visibleRecords.length === 0 && (
           <div style={{ background: colors.card, borderRadius: 16, padding: 24, textAlign: "center", color: colors.textSecondary, fontSize: 14 }}>
-            이 날은 학습 기록이 없어요.
+            {selectedDate ? "이 날은 학습 기록이 없어요." : "이번 달 학습 기록이 없어요."}
           </div>
         )}
 
