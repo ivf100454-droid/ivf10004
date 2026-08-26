@@ -12,7 +12,7 @@ export async function GET(req: NextRequest) {
   const students = await prisma.student.findMany({
     where: classId ? { currentClassId: classId } : undefined,
     include: { account: { select: { loginId: true, accountStatus: true } } },
-    orderBy: { createdAt: "asc" },
+    orderBy: { sortOrder: "asc" },
   });
   return NextResponse.json(students);
 }

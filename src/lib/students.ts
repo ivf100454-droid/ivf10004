@@ -17,11 +17,15 @@ export async function registerStudent(params: {
   const passwordHash = await hashPassword(params.initialPassword);
 
   return prisma.$transaction(async (tx) => {
+    const last = await tx.student.findFirst({ orderBy: { sortOrder: "desc" } });
+    const nextSortOrder = (last?.sortOrder ?? -1) + 1;
+
     const student = await tx.student.create({
       data: {
         name: params.name,
         studentStatus: "active",
         currentClassId: params.classId ?? null,
+        sortOrder: nextSortOrder,
       },
     });
 
@@ -85,8 +89,6 @@ export async function hardDeleteStudent(studentId: string) {
     await tx.student.delete({ where: { studentId } });
   });
 }
-
-/** 클래스 이동/제거. 과거 assignment의 class_id_snapshot은 절대 건드리지 않는다(3번 요구사항). */
 export async function changeStudentClass(studentId: string, newClassId: string | null) {
   return prisma.student.update({
     where: { studentId },

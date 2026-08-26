@@ -54,6 +54,7 @@ export default function StudentsPage() {
   const [loginMsg, setLoginMsg] = useState("");
 
   const [students, setStudents] = useState<Student[]>([]);
+  const [dragIdx, setDragIdx] = useState<number | null>(null);
   const [classes, setClasses] = useState<ClassItem[]>([]);
 
   const [mode, setMode] = useState<"list" | "add" | "edit">("list");
@@ -136,6 +137,27 @@ export default function StudentsPage() {
       setRegMsg(`실패: ${data.error}`);
     }
     setSaving(false);
+  }
+
+  function dragStart(idx: number) {
+    setDragIdx(idx);
+  }
+  function dragOver(e: React.DragEvent, idx: number) {
+    e.preventDefault();
+    if (dragIdx === null || dragIdx === idx) return;
+    const next = [...students];
+    const moved = next.splice(dragIdx, 1)[0];
+    next.splice(idx, 0, moved);
+    setStudents(next);
+    setDragIdx(idx);
+  }
+  async function dragEnd() {
+    setDragIdx(null);
+    await fetch("/api/admin/students/reorder", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ studentIds: students.map((s) => s.studentId) }),
+    });
   }
 
   function startEdit(s: Student) {
@@ -353,47 +375,65 @@ export default function StudentsPage() {
         <p style={{ color: colors.textSecondary, marginBottom: 16 }}>아직 등록된 학생이 없습니다.</p>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 16 }}>
-          {students.map((s) => {
+          <p style={{ fontSize: 12, color: colors.textMuted, margin: "-4px 0 0" }}>길게 눌러 순서를 바꿀 수 있어요</p>
+          {students.map((s, idx) => {
             const cls = classes.find((c) => c.classId === s.currentClassId);
             return (
-              <button
+              <div
                 key={s.studentId}
-                onClick={() => startEdit(s)}
+                draggable
+                onDragStart={() => dragStart(idx)}
+                onDragOver={(e) => dragOver(e, idx)}
+                onDragEnd={dragEnd}
                 style={{
-                  textAlign: "left",
                   ...card,
                   padding: "12px 14px",
                   display: "flex",
                   alignItems: "center",
-                  gap: 12,
-                  cursor: "pointer",
+                  gap: 10,
                 }}
               >
-                <div
+                <span style={{ color: colors.textMuted, cursor: "grab" }}>⠿</span>
+                <button
+                  onClick={() => startEdit(s)}
                   style={{
-                    width: 34,
-                    height: 34,
-                    borderRadius: "50%",
-                    background: colors.blueLight,
-                    color: colors.blue,
+                    flex: 1,
+                    textAlign: "left",
+                    background: "none",
+                    border: "none",
+                    padding: 0,
                     display: "flex",
                     alignItems: "center",
-                    justifyContent: "center",
-                    fontSize: 15,
-                    flexShrink: 0,
+                    gap: 12,
+                    cursor: "pointer",
                   }}
                 >
-                  🧑‍🎓
-                </div>
-                <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-                  <span style={{ fontSize: 14, fontWeight: 700, color: colors.navy }}>
-                    {s.name} {s.studentStatus === "withdrawn" && <span style={{ color: colors.pink, fontSize: 12, fontWeight: 600 }}>(퇴원)</span>}
+                  <div
+                    style={{
+                      width: 34,
+                      height: 34,
+                      borderRadius: "50%",
+                      background: colors.blueLight,
+                      color: colors.blue,
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      fontSize: 15,
+                      flexShrink: 0,
+                    }}
+                  >
+                    🧑‍🎓
+                  </div>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                    <span style={{ fontSize: 14, fontWeight: 700, color: colors.navy }}>
+                      {s.name} {s.studentStatus === "withdrawn" && <span style={{ color: colors.pink, fontSize: 12, fontWeight: 600 }}>(퇴원)</span>}
                   </span>
                   <span style={{ fontSize: 12, color: colors.textSecondary }}>
                     ID {s.account?.loginId} · {cls ? cls.name : "배치 보류"}
                   </span>
                 </div>
-              </button>
+                </button>
+              </div>
             );
           })}
         </div>
