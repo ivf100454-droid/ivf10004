@@ -211,6 +211,19 @@ export default function StudentsPage() {
     }
   }
 
+  async function handleHardDelete() {
+    if (!confirm("정말로 완전히 삭제하시겠어요?\n\n이 학생의 배정·제출 기록·아이디가 전부 영구히 사라지며, 되돌릴 수 없습니다.")) return;
+    if (!confirm("한 번 더 확인할게요. 정말 영구 삭제하시겠어요?")) return;
+    const res = await fetch("/api/admin/students/" + editingId, { method: "DELETE" });
+    const data = await res.json().catch(() => ({}));
+    if (res.ok) {
+      await refresh();
+      setMode("list");
+    } else {
+      setEditMsg("실패: " + data.error);
+    }
+  }
+
   if (!loggedIn) {
     return (
       <div style={{ maxWidth: 420, margin: "40px auto", padding: 16, fontFamily }}>
@@ -320,6 +333,15 @@ export default function StudentsPage() {
         >
           학생 삭제 (퇴원 처리)
         </button>
+
+        {student?.studentStatus === "withdrawn" && (
+          <button
+            onClick={handleHardDelete}
+            style={{ width: "100%", marginTop: 8, padding: 12, fontSize: 14, fontWeight: 700, color: "#fff", border: "none", borderRadius: 10, background: colors.pink, cursor: "pointer" }}
+          >
+            🗑️ 완전 삭제 (아이디까지 영구 삭제, 되돌릴 수 없음)
+          </button>
+        )}
       </div>
     );
   }
@@ -376,9 +398,28 @@ export default function StudentsPage() {
           })}
         </div>
       )}
-      <button onClick={startAdd} style={{ ...primaryBtn, width: "100%" }}>
+      <button onClick={startAdd} style={{ ...primaryBtn, width: "100%", marginBottom: 8 }}>
         + 학생등록
       </button>
+      
+        href="/api/admin/students/export"
+        style={{
+          display: "block",
+          width: "100%",
+          textAlign: "center",
+          boxSizing: "border-box",
+          padding: 12,
+          fontSize: 14,
+          fontWeight: 600,
+          color: colors.textSecondary,
+          background: colors.bg,
+          border: `1px solid ${colors.border}`,
+          borderRadius: 10,
+          textDecoration: "none",
+        }}
+      >
+        📊 학생 등록 현황 엑셀 다운로드
+      </a>
     </div>
   );
 }
