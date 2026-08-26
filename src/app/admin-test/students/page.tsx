@@ -401,7 +401,7 @@ export default function StudentsPage() {
       <button onClick={startAdd} style={{ ...primaryBtn, width: "100%", marginBottom: 8 }}>
         + 학생등록
       </button>
-      
+      <a
         href="/api/admin/students/export"
         style={{
           display: "block",
