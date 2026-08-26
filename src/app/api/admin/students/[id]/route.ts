@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getAdminFromRequest } from "@/lib/adminAuth";
-import { changeStudentClass } from "@/lib/students";
+import { changeStudentClass, hardDeleteStudent } from "@/lib/students";
 
 /**
  * 학생 정보 수정. name과 classId 둘 다(또는 하나만) 받을 수 있다.
@@ -39,4 +39,26 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   });
 
   return NextResponse.json(updated);
+}
+
+/**
+ * 완전 삭제(영구 삭제). 퇴원(withdrawn) 처리된 학생만 삭제할 수 있다 —
+ * 재학 중인 학생을 실수로 영구 삭제하는 사고를 막기 위한 안전장치.
+ * 되돌릴 수 없으므로, 화면에서도 명확한 확인 절차를 거친 뒤 호출해야 한다.
+ */
+export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
+  const admin = await getAdminFromRequest(req);
+  if (!admin) return NextResponse.json({ error: "관리자 로그인이 필요합니다." }, { status: 401 });
+
+  const student = await prisma.student.findUnique({ where: { studentId: params.id } });
+  if (!student) return NextResponse.json({ error: "존재하지 않는 학생입니다." }, { status: 404 });
+  if (student.studentStatus !== "withdrawn") {
+    return NextResponse.json(
+      { error: "퇴원 처리된 학생만 완전 삭제할 수 있습니다. 먼저 퇴원 처리해주세요." },
+      { status: 400 }
+    );
+  }
+
+  await hardDeleteStudent(params.id);
+  return NextResponse.json({ ok: true });
 }
