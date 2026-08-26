@@ -64,6 +64,28 @@ export async function withdrawStudent(studentId: string) {
   return account;
 }
 
+/**
+ * 완전 삭제(영구 삭제): 퇴원 처리된 학생만 대상으로, 계정·배정·제출 기록까지
+ * 전부 지우는 되돌릴 수 없는 작업이다. 실수로 재학생을 지우는 사고를 막기 위해
+ * 호출부(API)에서 studentStatus === "withdrawn"인지 반드시 먼저 확인해야 한다.
+ *
+ * 삭제 순서(외래키 제약 때문에 순서가 중요하다):
+ * 1) checklist_assignments 삭제 → 하위 assigned_items·제출 기록은 DB의
+ *    onDelete: Cascade로 자동 삭제된다.
+ * 2) student_accounts 삭제 → 하위 auth_sessions는 Cascade로 자동 삭제된다.
+ * 3) students 삭제 → share_links는 Cascade로 자동 삭제된다.
+ *
+ * 실제로 업로드된 파일(R2에 저장된 원본)은 이 함수에서 지우지 않는다 —
+ * DB 레코드만 정리하고, 스토리지 정리는 별도 배치 작업의 몫으로 남겨둔다.
+ */
+export async function hardDeleteStudent(studentId: string) {
+  return prisma.$transaction(async (tx) => {
+    await tx.checklistAssignment.deleteMany({ where: { studentId } });
+    await tx.studentAccount.deleteMany({ where: { studentId } });
+    await tx.student.delete({ where: { studentId } });
+  });
+}
+
 /** 클래스 이동/제거. 과거 assignment의 class_id_snapshot은 절대 건드리지 않는다(3번 요구사항). */
 export async function changeStudentClass(studentId: string, newClassId: string | null) {
   return prisma.student.update({
