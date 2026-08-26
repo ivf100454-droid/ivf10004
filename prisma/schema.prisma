@@ -92,6 +92,7 @@ model Student {
   studentStatus  StudentStatus @default(active) @map("student_status")
   currentClassId String?       @map("current_class_id")
   currentClass   Class?        @relation(fields: [currentClassId], references: [classId], onDelete: SetNull)
+  sortOrder      Int           @default(0) @map("sort_order")
   createdAt      DateTime      @default(now()) @map("created_at")
 
   account     StudentAccount?
