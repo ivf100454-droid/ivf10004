@@ -120,6 +120,7 @@ export default function TemplateBuilderPage() {
   const [editingId, setEditingId] = useState("");
   const [name, setName] = useState("");
   const [pickedIds, setPickedIds] = useState<string[]>([]);
+  const [dragChosenIdx, setDragChosenIdx] = useState<number | null>(null);
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState("");
 
@@ -184,6 +185,22 @@ export default function TemplateBuilderPage() {
 
   function removeActivity(id: string) {
     setPickedIds((prev) => prev.filter((x) => x !== id));
+  }
+
+  function dragChosenStart(idx: number) {
+    setDragChosenIdx(idx);
+  }
+  function dragChosenOver(e: React.DragEvent, idx: number) {
+    e.preventDefault();
+    if (dragChosenIdx === null || dragChosenIdx === idx) return;
+    const next = [...pickedIds];
+    const moved = next.splice(dragChosenIdx, 1)[0];
+    next.splice(idx, 0, moved);
+    setPickedIds(next);
+    setDragChosenIdx(idx);
+  }
+  function dragChosenEnd() {
+    setDragChosenIdx(null);
   }
 
   async function handleSave() {
@@ -258,12 +275,18 @@ export default function TemplateBuilderPage() {
 
         {chosen.length > 0 && (
           <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 16 }}>
-            {chosen.map((a) => (
+            <p style={{ fontSize: 12, color: colors.textMuted, margin: "0 0 2px" }}>길게 눌러 순서를 바꿀 수 있어요</p>
+            {chosen.map((a, idx) => (
               <div
                 key={a.activityId}
-                style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: colors.blueLight, borderRadius: 10, padding: "10px 14px" }}
+                draggable
+                onDragStart={() => dragChosenStart(idx)}
+                onDragOver={(e) => dragChosenOver(e, idx)}
+                onDragEnd={dragChosenEnd}
+                style={{ display: "flex", alignItems: "center", gap: 8, background: colors.blueLight, borderRadius: 10, padding: "10px 14px" }}
               >
-                <span style={{ fontSize: 14, color: colors.navy, fontWeight: 600 }}>
+                <span style={{ color: colors.blue, cursor: "grab" }}>⠿</span>
+                <span style={{ flex: 1, fontSize: 14, color: colors.navy, fontWeight: 600 }}>
                   {a.name} <span style={{ fontSize: 12, fontWeight: 400 }}>{activityTags(a)}</span>
                 </span>
                 <button type="button" onClick={() => removeActivity(a.activityId)} style={{ fontSize: 12, padding: "4px 10px", color: colors.blue, background: colors.card, border: "none", borderRadius: 8, cursor: "pointer" }}>
