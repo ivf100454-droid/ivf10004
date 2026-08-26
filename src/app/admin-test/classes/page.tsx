@@ -74,6 +74,7 @@ export default function ClassesPage() {
 
   const [classMsg, setClassMsg] = useState("");
   const [creatingName, setCreatingName] = useState<string | null>(null);
+  const [customClassName, setCustomClassName] = useState("");
   const [dragIdx, setDragIdx] = useState<number | null>(null);
 
   const [editingId, setEditingId] = useState("");
@@ -362,9 +363,9 @@ export default function ClassesPage() {
       <div style={{ ...card, padding: 18, marginBottom: 24 }}>
         <h2 style={{ fontSize: 15, fontWeight: 800, marginBottom: 10, color: colors.navy }}>수업 추가</h2>
         {availableNames.length === 0 ? (
-          <p style={{ fontSize: 13, color: colors.textSecondary }}>기본 18개 클래스가 모두 생성되었습니다.</p>
+          <p style={{ fontSize: 13, color: colors.textSecondary, marginBottom: 12 }}>기본 18개 클래스가 모두 생성되었습니다.</p>
         ) : (
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginBottom: 8 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginBottom: 12 }}>
             {availableNames.map((name) => (
               <button
                 key={name}
@@ -386,6 +387,35 @@ export default function ClassesPage() {
             ))}
           </div>
         )}
+
+        <div style={{ borderTop: `1px solid ${colors.border}`, paddingTop: 12 }}>
+          <p style={{ fontSize: 13, fontWeight: 700, color: colors.navy, marginBottom: 8 }}>직접 이름 입력해서 만들기</p>
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              const trimmed = customClassName.trim();
+              if (!trimmed) return;
+              handleCreateClass(trimmed);
+              setCustomClassName("");
+            }}
+            style={{ display: "flex", gap: 8 }}
+          >
+            <input
+              placeholder="예: Winter Camp, 특강반"
+              value={customClassName}
+              onChange={(e) => setCustomClassName(e.target.value)}
+              style={{ ...box, flex: 1 }}
+            />
+            <button
+              type="submit"
+              disabled={!customClassName.trim() || creatingName === customClassName.trim()}
+              style={{ ...primaryBtn, padding: "0 18px" }}
+            >
+              추가
+            </button>
+          </form>
+        </div>
+
         {classMsg && <p style={{ fontSize: 13, color: colors.blue, marginTop: 8 }}>{classMsg}</p>}
       </div>
 
