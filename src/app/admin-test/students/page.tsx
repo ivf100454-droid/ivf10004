@@ -212,7 +212,7 @@ export default function StudentsPage() {
   }
 
   async function handleHardDelete() {
-    if (!confirm("정말로 완전히 삭제하시겠어요?\n\n이 학생의 배정·제출 기록·아이디가 전부 영구히 사라지며, 되돌릴 수 없습니다.")) return;
+    if (!confirm("정말로 완전히 삭제하시겠어요? 이 학생의 배정, 제출 기록, 아이디가 전부 영구히 사라지며 되돌릴 수 없습니다.")) return;
     if (!confirm("한 번 더 확인할게요. 정말 영구 삭제하시겠어요?")) return;
     const res = await fetch("/api/admin/students/" + editingId, { method: "DELETE" });
     const data = await res.json().catch(() => ({}));
