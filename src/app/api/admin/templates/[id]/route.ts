@@ -30,6 +30,9 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
       where: { templateId: params.id },
       data: {
         name: name,
+        // 템플릿 수정 시마다 버전을 올린다 — 이미 생성된 일일 체크리스트는 생성 당시의
+        // 버전과 항목 스냅샷을 그대로 유지하므로 과거 기록에는 영향이 없다.
+        version: { increment: 1 },
         items: {
           create: activityIds.map((activityId, i) => {
             const a = byId.get(activityId)!;

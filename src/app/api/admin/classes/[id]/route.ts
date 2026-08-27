@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getAdminFromRequest } from "@/lib/adminAuth";
 import { ensureTodayAssignmentsForClass } from "@/lib/checklistGeneration";
+import { startOrReplaceRecurring, getActiveRecurring, endRecurring } from "@/lib/recurringAssignments";
 
 export async function PUT(req: NextRequest, { params }: { params: { id: string } }) {
   const admin = await getAdminFromRequest(req);
@@ -33,10 +34,23 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
     include: { template: true },
   });
 
-  // 반 기본 템플릿을 새로 연결한 경우, 개별 배정이 없고 아직 오늘자가 없는 학생들에게
-  // 즉시 오늘자 체크리스트를 생성한다 (진행 중인 학생은 건드리지 않음).
-  if (Object.prototype.hasOwnProperty.call(data, "templateId") && data.templateId) {
-    await ensureTodayAssignmentsForClass(updated.classId);
+  // 반 기본 템플릿 연결/해제는 이제 RecurringAssignment가 실제 자동 생성의 근거이므로,
+  // 이 화면에서 템플릿을 바꾸면 반복배정도 함께 시작/종료해준다.
+  if (Object.prototype.hasOwnProperty.call(data, "templateId")) {
+    if (data.templateId) {
+      await startOrReplaceRecurring({
+        targetType: "class",
+        classId: updated.classId,
+        templateId: data.templateId,
+        createdByAdminId: admin.adminId,
+      });
+      // 개별 배정이 없고 아직 오늘자가 없는 학생들에게 즉시 오늘자 체크리스트를 생성한다
+      // (진행 중인 학생은 건드리지 않음).
+      await ensureTodayAssignmentsForClass(updated.classId);
+    } else {
+      const existingRa = await getActiveRecurring("class", updated.classId);
+      if (existingRa) await endRecurring(existingRa.recurringAssignmentId);
+    }
   }
 
   return NextResponse.json({

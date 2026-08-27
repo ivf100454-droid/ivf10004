@@ -25,3 +25,12 @@ export function isAcademyToday(checklistDate: string | Date, now: Date = new Dat
       : getAcademyToday(checklistDate);
   return dateStr === getAcademyToday(now);
 }
+
+/**
+ * "YYYY-MM-DD" 형식의 달력 날짜의 요일(0=일 ~ 6=토)을 반환한다.
+ * 달력 날짜의 요일은 타임존과 무관하므로(그 날짜 자체가 이미 학원 타임존 기준으로 확정된
+ * 값) UTC 자정으로 파싱해도 안전하다.
+ */
+export function getWeekday(dateStr: string): number {
+  return new Date(`${dateStr}T00:00:00.000Z`).getUTCDay();
+}

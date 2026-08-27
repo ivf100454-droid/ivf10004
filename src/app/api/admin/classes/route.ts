@@ -8,16 +8,30 @@ export async function GET(req: NextRequest) {
 
   const classes = await prisma.class.findMany({
     orderBy: { sortOrder: "asc" },
-    include: { _count: { select: { students: true } }, template: true },
+    include: { _count: { select: { students: true } } },
   });
+
+  // 반 기본 템플릿은 이제 RecurringAssignment(targetType: "class")가 실제 근거다.
+  const activeClassRecurring = await prisma.recurringAssignment.findMany({
+    where: { targetType: "class", classId: { in: classes.map((c) => c.classId) }, status: "active" },
+    include: { template: { select: { name: true } } },
+    orderBy: { createdAt: "desc" },
+  });
+  const templateByClass = new Map<string, { templateId: string; templateName: string }>();
+  for (const ra of activeClassRecurring) {
+    if (ra.classId && !templateByClass.has(ra.classId)) {
+      templateByClass.set(ra.classId, { templateId: ra.templateId, templateName: ra.template.name });
+    }
+  }
+
   return NextResponse.json(
     classes.map((c) => ({
       classId: c.classId,
       name: c.name,
       sortOrder: c.sortOrder,
       studentCount: c._count.students,
-      templateId: c.templateId,
-      templateName: c.template ? c.template.name : null,
+      templateId: templateByClass.get(c.classId)?.templateId ?? null,
+      templateName: templateByClass.get(c.classId)?.templateName ?? null,
     }))
   );
 }

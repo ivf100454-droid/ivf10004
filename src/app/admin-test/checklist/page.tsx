@@ -19,6 +19,16 @@ type ClassRow = {
   templateId: string | null;
   templateName: string | null;
 };
+type RecurringRow = {
+  recurringAssignmentId: string;
+  templateId: string;
+  templateName: string;
+  status: "active" | "paused" | "ended";
+  startDate: string;
+  endDate: string | null;
+  activeDays: number[];
+  sequenceCounter: number;
+};
 
 type AssignedItem = {
   assignedItemId: string;
@@ -457,10 +467,12 @@ export default function ChecklistTestPage() {
   const [selectedStudentId, setSelectedStudentId] = useState("");
   const [selectedStudentTemplateId, setSelectedStudentTemplateId] = useState("");
   const [assignStudentMsg, setAssignStudentMsg] = useState("");
+  const [studentRecurring, setStudentRecurring] = useState<RecurringRow[]>([]);
 
   const [selectedClassId, setSelectedClassId] = useState("");
   const [selectedClassTemplateId, setSelectedClassTemplateId] = useState("");
   const [assignClassMsg, setAssignClassMsg] = useState("");
+  const [classRecurring, setClassRecurring] = useState<RecurringRow[]>([]);
 
   const [viewMode, setViewMode] = useState<"student" | "class">("student");
   const [viewStudentId, setViewStudentId] = useState("");
@@ -526,6 +538,56 @@ export default function ChecklistTestPage() {
     }
   }
 
+  async function loadStudentRecurring(studentId: string) {
+    if (!studentId) {
+      setStudentRecurring([]);
+      return;
+    }
+    const res = await fetch("/api/admin/recurring-assignments?studentId=" + studentId);
+    if (res.ok) setStudentRecurring(await res.json());
+  }
+
+  async function loadClassRecurring(classId: string) {
+    if (!classId) {
+      setClassRecurring([]);
+      return;
+    }
+    const res = await fetch("/api/admin/recurring-assignments?classId=" + classId);
+    if (res.ok) setClassRecurring(await res.json());
+  }
+
+  useEffect(() => {
+    loadStudentRecurring(selectedStudentId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedStudentId]);
+
+  useEffect(() => {
+    loadClassRecurring(selectedClassId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedClassId]);
+
+  async function handleRecurringAction(
+    recurringAssignmentId: string,
+    action: "pause" | "resume" | "end",
+    kind: "student" | "class"
+  ) {
+    const confirmMsg =
+      action === "end"
+        ? "이 반복배정을 종료하시겠어요? 지금까지 생성된 기록은 그대로 보존되고, 앞으로만 자동 생성이 멈춥니다."
+        : null;
+    if (confirmMsg && !window.confirm(confirmMsg)) return;
+
+    await fetch("/api/admin/recurring-assignments/" + recurringAssignmentId, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action }),
+    });
+
+    await refreshBase();
+    if (kind === "student") await loadStudentRecurring(selectedStudentId);
+    else await loadClassRecurring(selectedClassId);
+  }
+
   async function handleAssignStudent(e: React.FormEvent) {
     e.preventDefault();
     setAssignStudentMsg("");
@@ -549,6 +611,7 @@ export default function ChecklistTestPage() {
       if (activeViewStudentId === selectedStudentId) {
         await loadToday(selectedStudentId);
       }
+      await loadStudentRecurring(selectedStudentId);
     } else {
       setAssignStudentMsg("실패: " + data.error);
     }
@@ -575,6 +638,7 @@ export default function ChecklistTestPage() {
       );
       await refreshBase();
       if (activeViewStudentId) await loadToday(activeViewStudentId);
+      await loadClassRecurring(selectedClassId);
     } else {
       setAssignClassMsg("실패: " + data.error);
     }
@@ -729,6 +793,32 @@ export default function ChecklistTestPage() {
           </button>
         </form>
         {assignStudentMsg && <p style={{ fontSize: 13, color: colors.blue, marginTop: 8 }}>{assignStudentMsg}</p>}
+        {studentRecurring.map((ra) => (
+          <div
+            key={ra.recurringAssignmentId}
+            style={{ marginTop: 10, padding: 10, borderRadius: 8, background: colors.bg, fontSize: 12 }}
+          >
+            <div style={{ marginBottom: 6 }}>
+              <strong>{ra.templateName}</strong> ·{" "}
+              {ra.status === "active" ? "🟢 진행 중" : "⏸ 일시정지"} · 시작 {String(ra.startDate).slice(0, 10)} ·
+              지금까지 {ra.sequenceCounter}회 생성
+            </div>
+            <div style={{ display: "flex", gap: 6 }}>
+              {ra.status === "active" ? (
+                <button type="button" style={smallGhostBtn} onClick={() => handleRecurringAction(ra.recurringAssignmentId, "pause", "student")}>
+                  일시정지
+                </button>
+              ) : (
+                <button type="button" style={smallGhostBtn} onClick={() => handleRecurringAction(ra.recurringAssignmentId, "resume", "student")}>
+                  재개
+                </button>
+              )}
+              <button type="button" style={smallDangerBtn} onClick={() => handleRecurringAction(ra.recurringAssignmentId, "end", "student")}>
+                종료
+              </button>
+            </div>
+          </div>
+        ))}
       </div>
 
       <div style={{ ...card, padding: 18, marginBottom: 20 }}>
@@ -767,6 +857,32 @@ export default function ChecklistTestPage() {
           </button>
         </form>
         {assignClassMsg && <p style={{ fontSize: 13, color: colors.blue, marginTop: 8 }}>{assignClassMsg}</p>}
+        {classRecurring.map((ra) => (
+          <div
+            key={ra.recurringAssignmentId}
+            style={{ marginTop: 10, padding: 10, borderRadius: 8, background: colors.bg, fontSize: 12 }}
+          >
+            <div style={{ marginBottom: 6 }}>
+              <strong>{ra.templateName}</strong> ·{" "}
+              {ra.status === "active" ? "🟢 진행 중" : "⏸ 일시정지"} · 시작 {String(ra.startDate).slice(0, 10)} ·
+              지금까지 {ra.sequenceCounter}회 생성
+            </div>
+            <div style={{ display: "flex", gap: 6 }}>
+              {ra.status === "active" ? (
+                <button type="button" style={smallGhostBtn} onClick={() => handleRecurringAction(ra.recurringAssignmentId, "pause", "class")}>
+                  일시정지
+                </button>
+              ) : (
+                <button type="button" style={smallGhostBtn} onClick={() => handleRecurringAction(ra.recurringAssignmentId, "resume", "class")}>
+                  재개
+                </button>
+              )}
+              <button type="button" style={smallDangerBtn} onClick={() => handleRecurringAction(ra.recurringAssignmentId, "end", "class")}>
+                종료
+              </button>
+            </div>
+          </div>
+        ))}
       </div>
 
       <div style={{ ...card, padding: 18, marginBottom: 20 }}>

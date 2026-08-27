@@ -56,6 +56,7 @@ model Administrator {
   assignmentsCreated ChecklistAssignment[]
   teachingVideos     TeachingVideo[]
   shareLinksCreated  ShareLink[]
+  recurringAssignmentsCreated RecurringAssignment[]
 
   @@map("administrators")
 }
@@ -82,6 +83,7 @@ model Class {
   createdAt  DateTime @default(now()) @map("created_at")
 
   students Student[]
+  recurringAssignments RecurringAssignment[]
 
   @@map("classes")
 }
@@ -103,6 +105,7 @@ model Student {
   account     StudentAccount?
   assignments ChecklistAssignment[]
   shareLinks  ShareLink[]
+  recurringAssignments RecurringAssignment[]
 
   @@map("students")
 }
@@ -190,12 +193,17 @@ model Activity {
 model ChecklistTemplate {
   templateId String   @id @default(uuid()) @map("template_id")
   name       String
+  // 관리자가 이 템플릿(이름 또는 항목 구성)을 수정할 때마다 1씩 증가한다.
+  // 이미 생성된 일일 체크리스트는 생성 당시의 버전 번호(ChecklistAssignment.templateVersion)와
+  // 항목 스냅샷을 그대로 유지하므로, 이후 템플릿을 고쳐도 과거 기록은 바뀌지 않는다.
+  version    Int      @default(1)
   createdAt  DateTime @default(now()) @map("created_at")
 
   items       TemplateItem[]
   assignments ChecklistAssignment[]
   classes     Class[]
   standingStudents Student[] @relation("StudentStandingTemplate")
+  recurringAssignments RecurringAssignment[]
 
   @@map("checklist_templates")
 }
@@ -240,6 +248,47 @@ model TemplateItem {
   @@map("template_items")
 }
 
+/// "반복 배정" — 관리자가 학생 1명 또는 클래스 1개에 템플릿을 연결해두면, 이 정의를
+/// 근거로 매일(적용 요일에 한해) 새로운 일일 체크리스트(ChecklistAssignment)가 자동 생성된다.
+/// 학생-반복배정은 서로 다른 대상(같은 학생 개별 + 그 학생이 속한 반)에 대해 동시에 여러 개
+/// 존재할 수 있으며 서로 덮어쓰지 않는다 — 반 배정 위에 개별 배정이 "추가"되는 구조.
+model RecurringAssignment {
+  recurringAssignmentId String   @id @default(uuid()) @map("recurring_assignment_id")
+
+  targetType String  @map("target_type") // "student" | "class"
+  studentId  String? @map("student_id")
+  student    Student? @relation(fields: [studentId], references: [studentId], onDelete: Cascade)
+  classId    String? @map("class_id")
+  class      Class?   @relation(fields: [classId], references: [classId], onDelete: Cascade)
+
+  templateId String            @map("template_id")
+  template   ChecklistTemplate @relation(fields: [templateId], references: [templateId], onDelete: Restrict)
+
+  startDate DateTime  @map("start_date") @db.Date
+  endDate   DateTime? @map("end_date") @db.Date
+
+  // 적용 요일. 0=일 1=월 2=화 3=수 4=목 5=금 6=토. 기본값은 매일.
+  activeDays Int[] @default([0, 1, 2, 3, 4, 5, 6]) @map("active_days")
+
+  // active: 매일 자동 생성 중 / paused: 일시정지(생성 중단, 기록은 유지) / ended: 종료
+  status String @default("active") @map("status")
+
+  // 이 반복배정에서 지금까지 생성된 일일 체크리스트 개수 — 표시용 일련번호
+  // (jump1-1, jump1-2 ...)를 매기는 데 쓰인다. 절대 되돌리지 않고 계속 증가만 한다.
+  sequenceCounter Int @default(0) @map("sequence_counter")
+
+  createdByAdminId String?        @map("created_by_admin_id")
+  createdByAdmin   Administrator? @relation(fields: [createdByAdminId], references: [adminId], onDelete: SetNull)
+  createdAt        DateTime       @default(now()) @map("created_at")
+  updatedAt        DateTime       @updatedAt @map("updated_at")
+
+  assignments ChecklistAssignment[]
+
+  @@index([studentId, status])
+  @@index([classId, status])
+  @@map("recurring_assignments")
+}
+
 model ChecklistAssignment {
   assignmentId      String   @id @default(uuid()) @map("assignment_id")
   studentId         String   @map("student_id")
@@ -259,6 +308,19 @@ model ChecklistAssignment {
   // 관리자가 옛 방식으로 만든 배정이나 수동 배정은 null로 남는다.
   standingSource    String?  @map("standing_source")
 
+  // 이 일일 체크리스트를 생성한 반복배정(RecurringAssignment). 자동 생성분에만 값이 있고,
+  // 수동/레거시 배정은 null이다. (studentId, recurringAssignmentId, checklistDate) 조합에
+  // 유니크 제약을 걸어 같은 반복배정이 하루에 두 번 생성되는 것을 DB 레벨에서 방지한다.
+  recurringAssignmentId String?              @map("recurring_assignment_id")
+  recurringAssignment    RecurringAssignment? @relation(fields: [recurringAssignmentId], references: [recurringAssignmentId], onDelete: SetNull)
+
+  // 생성 당시 템플릿의 버전 번호 스냅샷. 이후 템플릿이 수정되어 버전이 올라가도 이 값과
+  // 아래 items의 내용은 그대로 유지된다 (과거 기록 불변).
+  templateVersion Int? @map("template_version")
+
+  // 표시용 일련번호 (jump1-1, jump1-2 ...) — 반복배정별로 1부터 증가. DB 식별자로는 쓰지 않는다.
+  sequenceNumber Int? @map("sequence_number")
+
   // 관리자가 학생의 그날 학습을 확인하고 "확인 완료"를 누른 시점 — 학생별 월간 캘린더에
   // 파란색으로 표시하는 기준이 된다(진행률 100%와는 별개의 "관리자 리뷰 완료" 개념).
   reviewedAt        DateTime? @map("reviewed_at")
@@ -267,6 +329,7 @@ model ChecklistAssignment {
   items AssignedChecklistItem[]
 
   @@index([studentId, checklistDate])
+  @@unique([studentId, recurringAssignmentId, checklistDate])
   @@map("checklist_assignments")
 }
 
