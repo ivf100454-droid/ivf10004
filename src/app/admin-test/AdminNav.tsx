@@ -13,6 +13,7 @@ const tabs = [
   { href: "/admin-test/checklist", label: "배정/확인", icon: "✅" },
   { href: "/admin-test/status", label: "완료 현황", icon: "📅" },
   { href: "/admin-test/teaching-videos", label: "학습영상", icon: "🎬" },
+  { href: "/admin-test/retention", label: "보존정리", icon: "🗑" },
 ];
 
 export default function AdminNav() {

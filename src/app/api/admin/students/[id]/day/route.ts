@@ -47,6 +47,12 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
     assignments.map(async (a) => ({
       assignmentId: a.assignmentId,
       reopenedForEditing: a.reopenedForEditing,
+      preservedByAdmin: a.preservedByAdmin,
+      deletionScheduledDate: (() => {
+        const d = new Date(a.checklistDate);
+        d.setUTCDate(d.getUTCDate() + 30);
+        return d.toISOString().slice(0, 10);
+      })(),
       items: await Promise.all(
         a.items.map(async (item) => {
           const photo = item.photoSubmissions[0];

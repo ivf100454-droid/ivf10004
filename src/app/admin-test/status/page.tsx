@@ -43,7 +43,13 @@ type DayItem = {
   fileMimeType: string | null;
   fileFilename: string | null;
 };
-type DayAssignment = { assignmentId: string; reopenedForEditing: boolean; items: DayItem[] };
+type DayAssignment = {
+  assignmentId: string;
+  reopenedForEditing: boolean;
+  preservedByAdmin: boolean;
+  deletionScheduledDate: string;
+  items: DayItem[];
+};
 type DayData = { studentName: string; date: string; isToday: boolean; progress: number; assignments: DayAssignment[] };
 
 const MONTH_NAMES = ["1월", "2월", "3월", "4월", "5월", "6월", "7월", "8월", "9월", "10월", "11월", "12월"];
@@ -211,6 +217,16 @@ export default function StatusPage() {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ reopened }),
+    });
+    const res = await fetch(`/api/admin/students/${activeStudentId}/day?date=${dayDateStr}`);
+    if (res.ok) setDayData(await res.json());
+  }
+
+  async function togglePreserve(assignmentId: string, preserved: boolean) {
+    await fetch(`/api/admin/assignments/${assignmentId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ preserved }),
     });
     const res = await fetch(`/api/admin/students/${activeStudentId}/day?date=${dayDateStr}`);
     if (res.ok) setDayData(await res.json());
@@ -418,6 +434,31 @@ export default function StatusPage() {
                     </button>
                   </div>
                 )}
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    background: a.preservedByAdmin ? "#eef7ee" : "#fafafa",
+                    border: `1px solid ${a.preservedByAdmin ? "#4caf50" : "#eee"}`,
+                    borderRadius: 8,
+                    padding: "8px 12px",
+                    marginBottom: 10,
+                    fontSize: 12,
+                  }}
+                >
+                  <span>
+                    {a.preservedByAdmin
+                      ? "🔒 보존 잠금 — 30일이 지나도 자동 정리에서 제외돼요."
+                      : `🗑 삭제 예정일: ${a.deletionScheduledDate} (그 이후 자동 정리 대상)`}
+                  </span>
+                  <button
+                    onClick={() => togglePreserve(a.assignmentId, !a.preservedByAdmin)}
+                    style={{ padding: "5px 10px", fontSize: 12, cursor: "pointer" }}
+                  >
+                    {a.preservedByAdmin ? "보존 해제" : "보존하기"}
+                  </button>
+                </div>
                 {a.items.map((item) => (
                   <div
                     key={item.assignedItemId}
