@@ -509,6 +509,9 @@ model ShareLink {
   studentId        String    @map("student_id")
   student          Student   @relation(fields: [studentId], references: [studentId], onDelete: Cascade)
   checklistDate    DateTime  @map("checklist_date") @db.Date
+  // 며칠치를 보여줄지. 1(기본값)=기존처럼 그 날 하루만. 7=checklistDate를 시작일로 한
+  // 일주일치 요약 리포트("학부모용 주간 요약 리포트").
+  rangeDays        Int       @default(1) @map("range_days")
   createdByAdminId String?   @map("created_by_admin_id")
   createdByAdmin   Administrator? @relation(fields: [createdByAdminId], references: [adminId], onDelete: SetNull)
   createdAt        DateTime  @default(now()) @map("created_at")

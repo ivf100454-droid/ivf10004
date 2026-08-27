@@ -178,6 +178,31 @@ export default function StatusPage() {
     }
   }
 
+  async function handleWeeklyShareLink() {
+    setShareMsg("생성 중...");
+    setShareUrl("");
+    // 이번 주 월요일을 시작일로 계산한다 (한국 기준 오늘 요일에서 역산).
+    const now = new Date();
+    const kstNow = new Date(now.getTime() + 9 * 60 * 60 * 1000);
+    const dow = kstNow.getUTCDay(); // 0=일 ~ 6=토
+    const diffToMonday = dow === 0 ? -6 : 1 - dow;
+    const monday = new Date(Date.UTC(kstNow.getUTCFullYear(), kstNow.getUTCMonth(), kstNow.getUTCDate() + diffToMonday));
+    const mondayStr = monday.toISOString().slice(0, 10);
+
+    const res = await fetch(`/api/admin/students/${activeStudentId}/share-link`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ checklistDate: mondayStr, rangeDays: 7 }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (res.ok) {
+      setShareUrl(window.location.origin + "/share/" + data.token);
+      setShareMsg("이번 주(월~일) 요약 링크가 생성되었습니다 (30일간 유효).");
+    } else {
+      setShareMsg("실패: " + data.error);
+    }
+  }
+
   function pad2(n: number) {
     return n < 10 ? "0" + n : String(n);
   }
@@ -368,7 +393,10 @@ export default function StatusPage() {
         </div>
 
         <button onClick={handleShareLink} style={{ width: "100%", padding: 12, fontSize: 15, marginBottom: 8 }}>
-          학부모 공유링크 만들기
+          학부모 공유링크 만들기 (오늘)
+        </button>
+        <button onClick={handleWeeklyShareLink} style={{ width: "100%", padding: 12, fontSize: 15, marginBottom: 8 }}>
+          학부모 주간 요약 리포트 링크 만들기 (이번 주 월~일)
         </button>
         {shareMsg && <p style={{ fontSize: 13 }}>{shareMsg}</p>}
         {shareUrl && (

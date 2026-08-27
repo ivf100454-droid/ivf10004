@@ -18,6 +18,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     typeof body.checklistDate === "string" ? body.checklistDate : getAcademyToday();
   const expiresInDays: number =
     typeof body.expiresInDays === "number" ? body.expiresInDays : 30;
+  const rangeDays: number = body.rangeDays === 7 ? 7 : 1;
 
   const token = randomUUID().replace(/-/g, "") + randomUUID().replace(/-/g, "");
 
@@ -26,6 +27,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       token: token,
       studentId: student.studentId,
       checklistDate: new Date(checklistDateStr + "T00:00:00.000Z"),
+      rangeDays: rangeDays,
       createdByAdminId: admin.adminId,
       expiresAt: new Date(Date.now() + expiresInDays * 24 * 60 * 60 * 1000),
     },
@@ -35,6 +37,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     {
       token: shareLink.token,
       checklistDate: checklistDateStr,
+      rangeDays: rangeDays,
       expiresAt: shareLink.expiresAt,
     },
     { status: 201 }
