@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db";
 import { getAdminFromRequest } from "@/lib/adminAuth";
 import { getAcademyToday } from "@/lib/timezone";
 import { getSignedDownloadUrl } from "@/lib/storage";
+import { ensureTodayAssignment } from "@/lib/checklistGeneration";
 
 /**
  * 특정 학생의 "오늘" 체크리스트 배정·항목·진행률을 반환한다.
@@ -13,6 +14,9 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
   if (!admin) return NextResponse.json({ error: "관리자 로그인이 필요합니다." }, { status: 401 });
 
   const todayStr = getAcademyToday();
+
+  // 오늘자 배정이 아직 없으면 고정 배정(개별 우선, 없으면 반 템플릿) 기준으로 자동 생성한다.
+  await ensureTodayAssignment(params.id);
 
   const assignments = await prisma.checklistAssignment.findMany({
     where: {

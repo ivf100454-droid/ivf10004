@@ -3,8 +3,22 @@
 import { useEffect, useState } from "react";
 import { colors, fontFamily } from "../theme";
 
-type Student = { studentId: string; name: string; studentStatus: string };
+type Student = {
+  studentId: string;
+  name: string;
+  studentStatus: string;
+  currentClassId: string | null;
+  standingTemplateId: string | null;
+  standingTemplate: { name: string } | null;
+};
 type Template = { templateId: string; name: string; items: { templateItemId: string }[] };
+type ClassRow = {
+  classId: string;
+  name: string;
+  studentCount: number;
+  templateId: string | null;
+  templateName: string | null;
+};
 
 type AssignedItem = {
   assignedItemId: string;
@@ -26,7 +40,7 @@ type AssignedItem = {
   completed: boolean;
   teachingVideo: { title: string; url: string } | null;
 };
-type Assignment = { assignmentId: string; items: AssignedItem[] };
+type Assignment = { assignmentId: string; items: AssignedItem[]; standingSource: "class" | "individual" | null };
 type TodayData = { assignments: Assignment[]; progress: number };
 
 const card: React.CSSProperties = {
@@ -438,19 +452,30 @@ export default function ChecklistTestPage() {
 
   const [students, setStudents] = useState<Student[]>([]);
   const [templates, setTemplates] = useState<Template[]>([]);
+  const [classes, setClasses] = useState<ClassRow[]>([]);
 
   const [selectedStudentId, setSelectedStudentId] = useState("");
-  const [selectedTemplateId, setSelectedTemplateId] = useState("");
-  const [assignMsg, setAssignMsg] = useState("");
+  const [selectedStudentTemplateId, setSelectedStudentTemplateId] = useState("");
+  const [assignStudentMsg, setAssignStudentMsg] = useState("");
 
+  const [selectedClassId, setSelectedClassId] = useState("");
+  const [selectedClassTemplateId, setSelectedClassTemplateId] = useState("");
+  const [assignClassMsg, setAssignClassMsg] = useState("");
+
+  const [viewMode, setViewMode] = useState<"student" | "class">("student");
   const [viewStudentId, setViewStudentId] = useState("");
+  const [viewClassId, setViewClassId] = useState("");
+  const [viewClassStudentId, setViewClassStudentId] = useState("");
   const [todayData, setTodayData] = useState<TodayData | null>(null);
   const [shareLinkUrl, setShareLinkUrl] = useState("");
   const [shareLinkMsg, setShareLinkMsg] = useState("");
 
+  const activeViewStudentId = viewMode === "student" ? viewStudentId : viewClassStudentId;
+
   async function refreshBase() {
     const sRes = await fetch("/api/admin/students");
     const tRes = await fetch("/api/admin/templates");
+    const cRes = await fetch("/api/admin/classes");
     if (sRes.status === 401) {
       setLoggedIn(false);
       return;
@@ -458,6 +483,7 @@ export default function ChecklistTestPage() {
     setLoggedIn(true);
     setStudents(await sRes.json());
     setTemplates(await tRes.json());
+    setClasses(await cRes.json());
   }
 
   useEffect(() => {
@@ -478,9 +504,10 @@ export default function ChecklistTestPage() {
   }
 
   useEffect(() => {
-    if (viewStudentId) loadToday(viewStudentId);
+    if (activeViewStudentId) loadToday(activeViewStudentId);
+    else setTodayData(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [viewStudentId]);
+  }, [activeViewStudentId]);
 
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault();
@@ -499,26 +526,57 @@ export default function ChecklistTestPage() {
     }
   }
 
-  async function handleAssign(e: React.FormEvent) {
+  async function handleAssignStudent(e: React.FormEvent) {
     e.preventDefault();
-    setAssignMsg("");
-    if (!selectedStudentId || !selectedTemplateId) {
-      setAssignMsg("학생과 템플릿을 모두 선택해주세요.");
+    setAssignStudentMsg("");
+    if (!selectedStudentId) {
+      setAssignStudentMsg("학생을 선택해주세요.");
       return;
     }
     const res = await fetch("/api/admin/assignments", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ studentId: selectedStudentId, templateId: selectedTemplateId }),
+      body: JSON.stringify({ studentId: selectedStudentId, templateId: selectedStudentTemplateId }),
     });
     const data = await res.json().catch(() => ({}));
     if (res.ok) {
-      setAssignMsg("배정 완료 (항목 " + data.items.length + "개)");
-      if (viewStudentId === selectedStudentId) {
+      setAssignStudentMsg(
+        selectedStudentTemplateId
+          ? "개별 추가 배정 완료 (항목 " + (data.items ? data.items.length : 0) + "개) — 반 체크리스트는 그대로 유지되고, 이 학생에게만 매일 자동으로 추가됩니다."
+          : "개별 배정을 해제했습니다. (반 기본 체크리스트는 그대로 유지됩니다.)"
+      );
+      await refreshBase();
+      if (activeViewStudentId === selectedStudentId) {
         await loadToday(selectedStudentId);
       }
     } else {
-      setAssignMsg("실패: " + data.error);
+      setAssignStudentMsg("실패: " + data.error);
+    }
+  }
+
+  async function handleAssignClass(e: React.FormEvent) {
+    e.preventDefault();
+    setAssignClassMsg("");
+    if (!selectedClassId) {
+      setAssignClassMsg("클래스를 선택해주세요.");
+      return;
+    }
+    const res = await fetch("/api/admin/assignments/class", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ classId: selectedClassId, templateId: selectedClassTemplateId }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (res.ok) {
+      setAssignClassMsg(
+        selectedClassTemplateId
+          ? "클래스 전체 반 배정 완료 (" + data.studentCount + "명 반, 오늘자 신규 생성 " + data.todayGeneratedCount + "명) — 개별 추가 배정된 학생은 그 위에 개별 체크리스트도 그대로 유지됩니다."
+          : "반 기본 템플릿을 해제했습니다."
+      );
+      await refreshBase();
+      if (activeViewStudentId) await loadToday(activeViewStudentId);
+    } else {
+      setAssignClassMsg("실패: " + data.error);
     }
   }
 
@@ -528,7 +586,7 @@ export default function ChecklistTestPage() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(patch),
     });
-    await loadToday(viewStudentId);
+    await loadToday(activeViewStudentId);
   }
 
   async function resetItem(item: AssignedItem) {
@@ -560,7 +618,7 @@ export default function ChecklistTestPage() {
         method: "DELETE",
       }).catch(function () {});
     }
-    await loadToday(viewStudentId);
+    await loadToday(activeViewStudentId);
   }
 
   async function handleDeleteAssignment(assignmentId: string) {
@@ -570,20 +628,20 @@ export default function ChecklistTestPage() {
       return {};
     });
     if (res.ok) {
-      await loadToday(viewStudentId);
+      await loadToday(activeViewStudentId);
     } else {
       alert("삭제 실패: " + data.error);
     }
   }
 
   async function handleCreateShareLink() {
-    if (!viewStudentId) {
+    if (!activeViewStudentId) {
       setShareLinkMsg("학생을 먼저 선택해주세요.");
       return;
     }
     setShareLinkMsg("링크 생성 중...");
     setShareLinkUrl("");
-    const res = await fetch("/api/admin/students/" + viewStudentId + "/share-link", {
+    const res = await fetch("/api/admin/students/" + activeViewStudentId + "/share-link", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({}),
@@ -635,8 +693,12 @@ export default function ChecklistTestPage() {
       <h1 style={{ fontSize: 20, fontWeight: 800, marginBottom: 16, color: colors.navy }}>체크리스트 배정 / 오늘 확인</h1>
 
       <div style={{ ...card, padding: 18, marginBottom: 20 }}>
-        <h2 style={{ fontSize: 15, fontWeight: 800, marginBottom: 10, color: colors.navy }}>1. 학생에게 배정</h2>
-        <form onSubmit={handleAssign} style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+        <h2 style={{ fontSize: 15, fontWeight: 800, marginBottom: 4, color: colors.navy }}>1. 학생에게 배정 (개별 추가)</h2>
+        <p style={{ fontSize: 12, color: colors.textSecondary, marginTop: 0, marginBottom: 10 }}>
+          한 번 배정하면 매일 같은 체크리스트가 자동으로 생성됩니다. 반 배정을 대체하지 않고,
+          이 학생에게만 추가로 얹힙니다 (예: 보충 과제 추가).
+        </p>
+        <form onSubmit={handleAssignStudent} style={{ display: "flex", flexDirection: "column", gap: 10 }}>
           <select
             value={selectedStudentId}
             onChange={(e) => setSelectedStudentId(e.target.value)}
@@ -646,15 +708,16 @@ export default function ChecklistTestPage() {
             {activeStudents.map((s) => (
               <option key={s.studentId} value={s.studentId}>
                 {s.name}
+                {s.standingTemplate ? " (개별: " + s.standingTemplate.name + ")" : ""}
               </option>
             ))}
           </select>
           <select
-            value={selectedTemplateId}
-            onChange={(e) => setSelectedTemplateId(e.target.value)}
+            value={selectedStudentTemplateId}
+            onChange={(e) => setSelectedStudentTemplateId(e.target.value)}
             style={box}
           >
-            <option value="">템플릿 선택</option>
+            <option value="">선택 안함 (개별 배정 해제)</option>
             {templates.map((t) => (
               <option key={t.templateId} value={t.templateId}>
                 {t.name} ({t.items.length}개 항목)
@@ -662,22 +725,113 @@ export default function ChecklistTestPage() {
             ))}
           </select>
           <button type="submit" style={primaryBtn}>
-            오늘 날짜로 배정
+            이 학생에게 개별 배정
           </button>
         </form>
-        {assignMsg && <p style={{ fontSize: 13, color: colors.blue, marginTop: 8 }}>{assignMsg}</p>}
+        {assignStudentMsg && <p style={{ fontSize: 13, color: colors.blue, marginTop: 8 }}>{assignStudentMsg}</p>}
       </div>
 
       <div style={{ ...card, padding: 18, marginBottom: 20 }}>
-        <h2 style={{ fontSize: 15, fontWeight: 800, marginBottom: 10, color: colors.navy }}>2. 오늘 체크리스트 보기</h2>
-        <select value={viewStudentId} onChange={(e) => setViewStudentId(e.target.value)} style={box}>
-          <option value="">학생 선택</option>
-          {activeStudents.map((s) => (
-            <option key={s.studentId} value={s.studentId}>
-              {s.name}
-            </option>
-          ))}
-        </select>
+        <h2 style={{ fontSize: 15, fontWeight: 800, marginBottom: 4, color: colors.navy }}>2. 클래스별 배정 (반 기본)</h2>
+        <p style={{ fontSize: 12, color: colors.textSecondary, marginTop: 0, marginBottom: 10 }}>
+          이 반의 활성 학생 전원에게 매일 같은 체크리스트가 자동으로 생성됩니다.
+          개별 배정이 있는 학생도 반 배정을 별도로 그대로 받습니다.
+        </p>
+        <form onSubmit={handleAssignClass} style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          <select
+            value={selectedClassId}
+            onChange={(e) => setSelectedClassId(e.target.value)}
+            style={box}
+          >
+            <option value="">클래스 선택</option>
+            {classes.map((c) => (
+              <option key={c.classId} value={c.classId}>
+                {c.name} ({c.studentCount}명){c.templateName ? " — 현재: " + c.templateName : ""}
+              </option>
+            ))}
+          </select>
+          <select
+            value={selectedClassTemplateId}
+            onChange={(e) => setSelectedClassTemplateId(e.target.value)}
+            style={box}
+          >
+            <option value="">선택 안함 (반 기본 템플릿 해제)</option>
+            {templates.map((t) => (
+              <option key={t.templateId} value={t.templateId}>
+                {t.name} ({t.items.length}개 항목)
+              </option>
+            ))}
+          </select>
+          <button type="submit" style={primaryBtn}>
+            이 클래스 전체에 배정
+          </button>
+        </form>
+        {assignClassMsg && <p style={{ fontSize: 13, color: colors.blue, marginTop: 8 }}>{assignClassMsg}</p>}
+      </div>
+
+      <div style={{ ...card, padding: 18, marginBottom: 20 }}>
+        <h2 style={{ fontSize: 15, fontWeight: 800, marginBottom: 10, color: colors.navy }}>3. 오늘 체크리스트 보기</h2>
+
+        <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
+          <button
+            type="button"
+            onClick={() => setViewMode("student")}
+            style={viewMode === "student" ? primaryBtn : smallGhostBtn}
+          >
+            1) 학생으로 보기
+          </button>
+          <button
+            type="button"
+            onClick={() => setViewMode("class")}
+            style={viewMode === "class" ? primaryBtn : smallGhostBtn}
+          >
+            2) 클래스로 보기
+          </button>
+        </div>
+
+        {viewMode === "student" ? (
+          <select value={viewStudentId} onChange={(e) => setViewStudentId(e.target.value)} style={box}>
+            <option value="">학생 선택</option>
+            {activeStudents.map((s) => (
+              <option key={s.studentId} value={s.studentId}>
+                {s.name}
+              </option>
+            ))}
+          </select>
+        ) : (
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            <select
+              value={viewClassId}
+              onChange={(e) => {
+                setViewClassId(e.target.value);
+                setViewClassStudentId("");
+              }}
+              style={box}
+            >
+              <option value="">클래스 선택</option>
+              {classes.map((c) => (
+                <option key={c.classId} value={c.classId}>
+                  {c.name} ({c.studentCount}명)
+                </option>
+              ))}
+            </select>
+            <select
+              value={viewClassStudentId}
+              onChange={(e) => setViewClassStudentId(e.target.value)}
+              style={box}
+              disabled={!viewClassId}
+            >
+              <option value="">학생 선택</option>
+              {activeStudents
+                .filter((s) => s.currentClassId === viewClassId)
+                .map((s) => (
+                  <option key={s.studentId} value={s.studentId}>
+                    {s.name}
+                  </option>
+                ))}
+            </select>
+          </div>
+        )}
 
         <button
           type="button"
@@ -724,7 +878,18 @@ export default function ChecklistTestPage() {
 
           {todayData.assignments.map((a) => (
             <div key={a.assignmentId} style={{ marginBottom: 20 }}>
-              <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 8 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                {a.standingSource === "class" && (
+                  <span style={{ fontSize: 12, fontWeight: 700, color: colors.blue, background: colors.blueLight, padding: "3px 10px", borderRadius: 8 }}>
+                    🏫 반 기본 체크리스트
+                  </span>
+                )}
+                {a.standingSource === "individual" && (
+                  <span style={{ fontSize: 12, fontWeight: 700, color: colors.pink, background: "#fdeef2", padding: "3px 10px", borderRadius: 8 }}>
+                    ➕ 개별 추가 체크리스트
+                  </span>
+                )}
+                {!a.standingSource && <span />}
                 <button
                   type="button"
                   onClick={() => handleDeleteAssignment(a.assignmentId)}
@@ -834,13 +999,13 @@ export default function ChecklistTestPage() {
                     </div>
                   )}
 
-                  {item.hasPhotoSubmission && <PhotoUploader assignedItemId={item.assignedItemId} onDone={function () { loadToday(viewStudentId); }} />}
+                  {item.hasPhotoSubmission && <PhotoUploader assignedItemId={item.assignedItemId} onDone={function () { loadToday(activeViewStudentId); }} />}
 
-                  {item.hasAudioSubmission && <AudioUploader assignedItemId={item.assignedItemId} onDone={function () { loadToday(viewStudentId); }} />}
+                  {item.hasAudioSubmission && <AudioUploader assignedItemId={item.assignedItemId} onDone={function () { loadToday(activeViewStudentId); }} />}
 
-                  {item.hasVideoSubmission && <VideoUploader assignedItemId={item.assignedItemId} onDone={function () { loadToday(viewStudentId); }} />}
+                  {item.hasVideoSubmission && <VideoUploader assignedItemId={item.assignedItemId} onDone={function () { loadToday(activeViewStudentId); }} />}
 
-                  {item.hasFileSubmission && <FileUploader assignedItemId={item.assignedItemId} onDone={function () { loadToday(viewStudentId); }} />}
+                  {item.hasFileSubmission && <FileUploader assignedItemId={item.assignedItemId} onDone={function () { loadToday(activeViewStudentId); }} />}
                 </div>
               ))}
             </div>

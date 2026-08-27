@@ -95,6 +95,11 @@ model Student {
   sortOrder      Int           @default(0) @map("sort_order")
   createdAt      DateTime      @default(now()) @map("created_at")
 
+  // 학생 개별 "고정 배정" 템플릿. 값이 있으면 반(Class.templateId)보다 우선하여
+  // 매일 자동 생성되는 오늘의 체크리스트에 이 템플릿이 쓰인다. null이면 반 템플릿을 따른다.
+  standingTemplateId String?            @map("standing_template_id")
+  standingTemplate    ChecklistTemplate? @relation("StudentStandingTemplate", fields: [standingTemplateId], references: [templateId], onDelete: SetNull)
+
   account     StudentAccount?
   assignments ChecklistAssignment[]
   shareLinks  ShareLink[]
@@ -190,6 +195,7 @@ model ChecklistTemplate {
   items       TemplateItem[]
   assignments ChecklistAssignment[]
   classes     Class[]
+  standingStudents Student[] @relation("StudentStandingTemplate")
 
   @@map("checklist_templates")
 }
@@ -246,6 +252,12 @@ model ChecklistAssignment {
   createdByAdminId  String?  @map("created_by_admin_id")
   createdByAdmin    Administrator? @relation(fields: [createdByAdminId], references: [adminId], onDelete: SetNull)
   createdAt         DateTime @default(now()) @map("created_at")
+
+  // 이 배정이 "반 기본 템플릿"에서 자동 생성된 것인지("class"), 학생 "개별 고정 배정"에서
+  // 자동 생성된 것인지("individual")를 구분한다. 반과 개별은 서로 덮어쓰지 않고
+  // 같은 날 함께 존재할 수 있다 — 개별 배정은 "반 체크리스트에 추가로 얹는" 용도.
+  // 관리자가 옛 방식으로 만든 배정이나 수동 배정은 null로 남는다.
+  standingSource    String?  @map("standing_source")
 
   // 관리자가 학생의 그날 학습을 확인하고 "확인 완료"를 누른 시점 — 학생별 월간 캘린더에
   // 파란색으로 표시하는 기준이 된다(진행률 100%와는 별개의 "관리자 리뷰 완료" 개념).

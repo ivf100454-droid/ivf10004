@@ -11,7 +11,10 @@ export async function GET(req: NextRequest) {
   const classId = req.nextUrl.searchParams.get("classId");
   const students = await prisma.student.findMany({
     where: classId ? { currentClassId: classId } : undefined,
-    include: { account: { select: { loginId: true, accountStatus: true } } },
+    include: {
+      account: { select: { loginId: true, accountStatus: true } },
+      standingTemplate: { select: { name: true } },
+    },
     orderBy: { sortOrder: "asc" },
   });
   return NextResponse.json(students);
