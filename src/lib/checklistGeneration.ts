@@ -54,6 +54,7 @@ async function ensureAssignmentForRecurring(
         classNameSnapshot: studentSnapshot.className,
         sourceTemplateId: template.templateId,
         templateVersion: template.version,
+        instruction: template.instruction,
         recurringAssignmentId: ra.recurringAssignmentId,
         sequenceNumber: updatedRa.sequenceCounter,
         // 기존 화면의 "🏫 반 기본" / "➕ 개별 추가" 라벨과 호환되도록 그대로 매핑한다.

@@ -22,7 +22,7 @@ type AssignedItem = {
   hasFileSubmission: boolean;
   completed: boolean;
 };
-type Assignment = { assignmentId: string; items: AssignedItem[] };
+type Assignment = { assignmentId: string; instruction: string | null; items: AssignedItem[] };
 type TodayData = { assignments: Assignment[]; progress: number };
 
 type TabKey = "all" | "learn" | "submit" | "practice";
@@ -38,6 +38,7 @@ export default function ChecklistPage() {
   }, []);
 
   const allItems = data ? data.assignments.flatMap((a) => a.items) : [];
+  const instructions = data ? data.assignments.map((a) => a.instruction).filter((t): t is string => !!t && t.trim() !== "") : [];
   const learnItems = allItems.filter((i) => !isSubmissionItem(i) && !(i.hasCount && !i.hasCheck && !i.hasScore));
   const submitItems = allItems.filter((i) => isSubmissionItem(i));
   const practiceItems = allItems.filter((i) => i.hasCount && !i.hasCheck && !i.hasScore && !isSubmissionItem(i));
@@ -85,6 +86,25 @@ export default function ChecklistPage() {
           </div>
           <div style={{ fontSize: 18, fontWeight: 800, color: colors.blue }}>{data?.progress ?? 0}%</div>
         </div>
+
+        {instructions.length > 0 && (
+          <div
+            style={{
+              background: colors.blueLight,
+              borderRadius: 16,
+              padding: 16,
+              marginBottom: 16,
+              display: "flex",
+              alignItems: "flex-start",
+              gap: 10,
+            }}
+          >
+            <span style={{ fontSize: 20 }}>📢</span>
+            <div style={{ fontSize: 14, color: colors.navy, whiteSpace: "pre-wrap", lineHeight: 1.5 }}>
+              {instructions.join("\n\n")}
+            </div>
+          </div>
+        )}
 
         <div style={{ display: "flex", gap: 8, marginBottom: 16, overflowX: "auto" }}>
           {tabs.map((t) => (

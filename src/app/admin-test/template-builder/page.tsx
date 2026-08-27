@@ -38,6 +38,7 @@ type TemplateItem = {
 type Template = {
   templateId: string;
   name: string;
+  instruction: string | null;
   items: TemplateItem[];
 };
 
@@ -119,6 +120,7 @@ export default function TemplateBuilderPage() {
   const [mode, setMode] = useState<"list" | "edit">("list");
   const [editingId, setEditingId] = useState("");
   const [name, setName] = useState("");
+  const [instruction, setInstruction] = useState("");
   const [pickedIds, setPickedIds] = useState<string[]>([]);
   const [dragChosenIdx, setDragChosenIdx] = useState<number | null>(null);
   const [saving, setSaving] = useState(false);
@@ -161,6 +163,7 @@ export default function TemplateBuilderPage() {
   function startNew() {
     setEditingId("");
     setName("");
+    setInstruction("");
     setPickedIds([]);
     setMode("edit");
     setMsg("");
@@ -169,6 +172,7 @@ export default function TemplateBuilderPage() {
   function startEdit(t: Template) {
     setEditingId(t.templateId);
     setName(t.name);
+    setInstruction(t.instruction || "");
     setPickedIds(t.items.filter((it) => it.activityId).map((it) => it.activityId as string));
     setMode("edit");
     setMsg("");
@@ -218,7 +222,7 @@ export default function TemplateBuilderPage() {
     const res = await fetch(url, {
       method: editingId ? "PUT" : "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: name.trim(), activityIds: pickedIds }),
+      body: JSON.stringify({ name: name.trim(), instruction: instruction.trim(), activityIds: pickedIds }),
     });
     const data = await res.json().catch(() => ({}));
     if (res.ok) {
@@ -270,8 +274,20 @@ export default function TemplateBuilderPage() {
           placeholder="템플릿 이름 (예: 기본 체크리스트)"
           value={name}
           onChange={(e) => setName(e.target.value)}
-          style={{ ...box, marginBottom: 16 }}
+          style={{ ...box, marginBottom: 12 }}
         />
+
+        <textarea
+          placeholder="오늘의 안내문 (선택) — 예: 오늘은 8과 단어시험이 있어요. 시험 전에 단어를 3번씩 써보고 오세요!"
+          value={instruction}
+          onChange={(e) => setInstruction(e.target.value)}
+          rows={3}
+          style={{ ...box, marginBottom: 6, resize: "vertical" }}
+        />
+        <p style={{ fontSize: 12, color: colors.textMuted, marginTop: 0, marginBottom: 16 }}>
+          학생 체크리스트 화면 상단에 그대로 보여집니다. 다음 자동 생성분부터 적용되며,
+          이미 생성된 지난 체크리스트의 안내문은 바뀌지 않아요.
+        </p>
 
         {chosen.length > 0 && (
           <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 16 }}>

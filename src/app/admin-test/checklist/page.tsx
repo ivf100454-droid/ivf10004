@@ -50,7 +50,12 @@ type AssignedItem = {
   completed: boolean;
   teachingVideo: { title: string; url: string } | null;
 };
-type Assignment = { assignmentId: string; items: AssignedItem[]; standingSource: "class" | "individual" | null };
+type Assignment = {
+  assignmentId: string;
+  items: AssignedItem[];
+  standingSource: "class" | "individual" | null;
+  instruction: string | null;
+};
 type TodayData = { assignments: Assignment[]; progress: number };
 
 const card: React.CSSProperties = {
@@ -1014,6 +1019,22 @@ export default function ChecklistTestPage() {
                   이 배정 전체 삭제
                 </button>
               </div>
+              {a.instruction && (
+                <div
+                  style={{
+                    background: colors.blueLight,
+                    borderRadius: 10,
+                    padding: 12,
+                    marginBottom: 10,
+                    fontSize: 13,
+                    color: colors.navy,
+                    whiteSpace: "pre-wrap",
+                    lineHeight: 1.5,
+                  }}
+                >
+                  📢 {a.instruction}
+                </div>
+              )}
               {a.items.map((item) => (
                 <div
                   key={item.assignedItemId}

@@ -30,6 +30,7 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
       where: { templateId: params.id },
       data: {
         name: name,
+        instruction: typeof body?.instruction === "string" && body.instruction.trim() ? body.instruction.trim() : null,
         // 템플릿 수정 시마다 버전을 올린다 — 이미 생성된 일일 체크리스트는 생성 당시의
         // 버전과 항목 스냅샷을 그대로 유지하므로 과거 기록에는 영향이 없다.
         version: { increment: 1 },
@@ -70,6 +71,34 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
   });
 
   return NextResponse.json(updated);
+}
+
+/**
+ * 안내문만 빠르게 수정한다 (활동 구성을 다시 고를 필요 없음 — 매일 안내문만 바꾸는
+ * 용도). 이 역시 템플릿 버전을 올리므로, 다음 자동 생성분부터 새 안내문이 반영되고
+ * 이미 생성된 과거 배정의 안내문은 그대로 유지된다.
+ */
+export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
+  const admin = await getAdminFromRequest(req);
+  if (!admin) return NextResponse.json({ error: "관리자 로그인이 필요합니다." }, { status: 401 });
+
+  const existing = await prisma.checklistTemplate.findUnique({ where: { templateId: params.id } });
+  if (!existing) return NextResponse.json({ error: "존재하지 않는 템플릿입니다." }, { status: 404 });
+
+  const body = await req.json().catch(() => null);
+  if (!body || typeof body.instruction !== "string") {
+    return NextResponse.json({ error: "instruction 문자열이 필요합니다." }, { status: 400 });
+  }
+
+  const updated = await prisma.checklistTemplate.update({
+    where: { templateId: params.id },
+    data: {
+      instruction: body.instruction.trim() ? body.instruction.trim() : null,
+      version: { increment: 1 },
+    },
+  });
+
+  return NextResponse.json({ templateId: updated.templateId, instruction: updated.instruction, version: updated.version });
 }
 
 export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {

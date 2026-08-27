@@ -193,6 +193,10 @@ model Activity {
 model ChecklistTemplate {
   templateId String   @id @default(uuid()) @map("template_id")
   name       String
+  // 관리자가 학생들에게 보여줄 오늘의 안내문(자유 텍스트). 배정 생성 시점의 내용이
+  // ChecklistAssignment.instruction에 스냅샷으로 복사되므로, 이후 안내문을 고쳐도
+  // 이미 생성된 과거 배정의 안내문은 바뀌지 않는다.
+  instruction String? @map("instruction")
   // 관리자가 이 템플릿(이름 또는 항목 구성)을 수정할 때마다 1씩 증가한다.
   // 이미 생성된 일일 체크리스트는 생성 당시의 버전 번호(ChecklistAssignment.templateVersion)와
   // 항목 스냅샷을 그대로 유지하므로, 이후 템플릿을 고쳐도 과거 기록은 바뀌지 않는다.
@@ -317,6 +321,10 @@ model ChecklistAssignment {
   // 생성 당시 템플릿의 버전 번호 스냅샷. 이후 템플릿이 수정되어 버전이 올라가도 이 값과
   // 아래 items의 내용은 그대로 유지된다 (과거 기록 불변).
   templateVersion Int? @map("template_version")
+
+  // 생성 당시 템플릿의 "오늘의 안내문" 스냅샷. 이후 템플릿의 안내문이 바뀌어도 이미 생성된
+  // 이 배정의 안내문은 그대로 유지된다.
+  instruction String? @map("instruction")
 
   // 표시용 일련번호 (jump1-1, jump1-2 ...) — 반복배정별로 1부터 증가. DB 식별자로는 쓰지 않는다.
   sequenceNumber Int? @map("sequence_number")

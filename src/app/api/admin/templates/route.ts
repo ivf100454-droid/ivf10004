@@ -44,6 +44,7 @@ export async function POST(req: NextRequest) {
   const template = await prisma.checklistTemplate.create({
     data: {
       name: name,
+      instruction: typeof body?.instruction === "string" && body.instruction.trim() ? body.instruction.trim() : null,
       items: {
         create: activityIds.map((activityId, i) => {
           const a = byId.get(activityId)!;
