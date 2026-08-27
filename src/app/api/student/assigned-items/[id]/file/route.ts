@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { randomUUID } from "crypto";
 import { prisma } from "@/lib/db";
 import { getStudentFromRequest } from "@/lib/studentAuth";
-import { isAcademyToday } from "@/lib/timezone";
+import { isAssignmentEditable } from "@/lib/timezone";
 import { uploadToR2, getSignedDownloadUrl } from "@/lib/storage";
 
 // "파일 제출"은 형식을 가리지 않는 범용 업로드다 — 사진/PDF/음성/영상/문서 무엇이든
@@ -53,7 +53,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   if (!item.hasFileSubmission) {
     return NextResponse.json({ error: "이 항목은 파일 제출 기능이 꺼져 있습니다." }, { status: 400 });
   }
-  if (!isAcademyToday(item.assignment.checklistDate)) {
+  if (!isAssignmentEditable(item.assignment)) {
     return NextResponse.json({ error: "과거 날짜의 항목은 수정할 수 없습니다." }, { status: 403 });
   }
 
@@ -160,7 +160,7 @@ export async function DELETE(req: NextRequest, { params }: { params: { id: strin
   if ("error" in check) return NextResponse.json({ error: check.error }, { status: check.status });
   const item = check.item;
 
-  if (!isAcademyToday(item.assignment.checklistDate)) {
+  if (!isAssignmentEditable(item.assignment)) {
     return NextResponse.json({ error: "과거 날짜의 항목은 수정할 수 없습니다." }, { status: 403 });
   }
 

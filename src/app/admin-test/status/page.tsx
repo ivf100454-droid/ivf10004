@@ -43,8 +43,8 @@ type DayItem = {
   fileMimeType: string | null;
   fileFilename: string | null;
 };
-type DayAssignment = { assignmentId: string; items: DayItem[] };
-type DayData = { studentName: string; date: string; progress: number; assignments: DayAssignment[] };
+type DayAssignment = { assignmentId: string; reopenedForEditing: boolean; items: DayItem[] };
+type DayData = { studentName: string; date: string; isToday: boolean; progress: number; assignments: DayAssignment[] };
 
 const MONTH_NAMES = ["1월", "2월", "3월", "4월", "5월", "6월", "7월", "8월", "9월", "10월", "11월", "12월"];
 
@@ -204,6 +204,16 @@ export default function StatusPage() {
     } else {
       setDayShareMsg("실패: " + data.error);
     }
+  }
+
+  async function toggleReopen(assignmentId: string, reopened: boolean) {
+    await fetch(`/api/admin/assignments/${assignmentId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ reopened }),
+    });
+    const res = await fetch(`/api/admin/students/${activeStudentId}/day?date=${dayDateStr}`);
+    if (res.ok) setDayData(await res.json());
   }
 
   const box: React.CSSProperties = { padding: 10, fontSize: 15, width: "100%", boxSizing: "border-box" };
@@ -381,6 +391,33 @@ export default function StatusPage() {
 
             {dayData.assignments.map((a) => (
               <div key={a.assignmentId}>
+                {!dayData.isToday && (
+                  <div
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      background: a.reopenedForEditing ? "#fff7e6" : "#f5f5f5",
+                      border: `1px solid ${a.reopenedForEditing ? "#f0b429" : "#ddd"}`,
+                      borderRadius: 8,
+                      padding: "8px 12px",
+                      marginBottom: 10,
+                      fontSize: 12,
+                    }}
+                  >
+                    <span>
+                      {a.reopenedForEditing
+                        ? "🔓 지금 재오픈 중 — 학생이 이 날짜 기록을 수정/재제출할 수 있어요."
+                        : "🔒 과거 기록이라 잠겨 있어요 — 학생이 수정할 수 없어요."}
+                    </span>
+                    <button
+                      onClick={() => toggleReopen(a.assignmentId, !a.reopenedForEditing)}
+                      style={{ padding: "5px 10px", fontSize: 12, cursor: "pointer" }}
+                    >
+                      {a.reopenedForEditing ? "다시 잠그기" : "재오픈"}
+                    </button>
+                  </div>
+                )}
                 {a.items.map((item) => (
                   <div
                     key={item.assignedItemId}

@@ -27,6 +27,14 @@ export function isAcademyToday(checklistDate: string | Date, now: Date = new Dat
 }
 
 /**
+ * 이 배정을 지금 수정(체크/점수/제출 파일 변경)할 수 있는지 판단한다.
+ * 오늘 날짜 배정이거나, 관리자가 명시적으로 "재오픈"한 배정만 수정할 수 있다.
+ */
+export function isAssignmentEditable(assignment: { checklistDate: Date; reopenedForEditing?: boolean }): boolean {
+  return isAcademyToday(assignment.checklistDate) || !!assignment.reopenedForEditing;
+}
+
+/**
  * "YYYY-MM-DD" 형식의 달력 날짜의 요일(0=일 ~ 6=토)을 반환한다.
  * 달력 날짜의 요일은 타임존과 무관하므로(그 날짜 자체가 이미 학원 타임존 기준으로 확정된
  * 값) UTC 자정으로 파싱해도 안전하다.

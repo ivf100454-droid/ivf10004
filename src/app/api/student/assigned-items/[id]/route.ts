@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getStudentFromRequest } from "@/lib/studentAuth";
-import { isAcademyToday } from "@/lib/timezone";
+import { isAssignmentEditable } from "@/lib/timezone";
 
 function evaluateCompleted(
   required: string[],
@@ -44,7 +44,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   if (item.assignment.studentId !== student.studentId) {
     return NextResponse.json({ error: "본인의 체크리스트만 수정할 수 있습니다." }, { status: 403 });
   }
-  if (!isAcademyToday(item.assignment.checklistDate)) {
+  if (!isAssignmentEditable(item.assignment)) {
     return NextResponse.json({ error: "과거 날짜의 항목은 수정할 수 없습니다." }, { status: 403 });
   }
 

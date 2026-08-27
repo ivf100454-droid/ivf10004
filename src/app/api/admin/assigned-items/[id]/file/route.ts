@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { randomUUID } from "crypto";
 import { prisma } from "@/lib/db";
 import { getAdminFromRequest } from "@/lib/adminAuth";
-import { isAcademyToday } from "@/lib/timezone";
+import { isAssignmentEditable } from "@/lib/timezone";
 import { uploadToR2, getSignedDownloadUrl } from "@/lib/storage";
 
 const MAX_FILE_SIZE = 50 * 1024 * 1024;
@@ -40,7 +40,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   if (!item.hasFileSubmission) {
     return NextResponse.json({ error: "이 항목은 파일 제출 기능이 꺼져 있습니다." }, { status: 400 });
   }
-  if (!isAcademyToday(item.assignment.checklistDate)) {
+  if (!isAssignmentEditable(item.assignment)) {
     return NextResponse.json({ error: "과거 날짜의 항목은 수정할 수 없습니다." }, { status: 403 });
   }
 
@@ -145,7 +145,7 @@ export async function DELETE(req: NextRequest, { params }: { params: { id: strin
     include: { assignment: true },
   });
   if (!item) return NextResponse.json({ error: "존재하지 않는 항목입니다." }, { status: 404 });
-  if (!isAcademyToday(item.assignment.checklistDate)) {
+  if (!isAssignmentEditable(item.assignment)) {
     return NextResponse.json({ error: "과거 날짜의 항목은 수정할 수 없습니다." }, { status: 403 });
   }
 

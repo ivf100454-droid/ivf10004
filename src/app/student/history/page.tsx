@@ -24,6 +24,39 @@ type DailyRecord = {
   avgScorePct: number | null;
   items: DailyItem[];
 };
+type DayDetailItem = {
+  assignedItemId: string;
+  title: string;
+  hasCheck: boolean;
+  checked: boolean;
+  hasCount: boolean;
+  currentCount: number;
+  targetCount: number | null;
+  hasScore: boolean;
+  score: number | null;
+  maxScore: number | null;
+  hasPhotoSubmission: boolean;
+  hasAudioSubmission: boolean;
+  hasVideoSubmission: boolean;
+  hasFileSubmission: boolean;
+  completed: boolean;
+  photoUrl: string | null;
+  photoMimeType: string | null;
+  photoFilename: string | null;
+  audioUrl: string | null;
+  audioFilename: string | null;
+  videoUrl: string | null;
+  videoFilename: string | null;
+  fileUrl: string | null;
+  fileMimeType: string | null;
+  fileFilename: string | null;
+};
+type DayDetail = {
+  date: string;
+  isToday: boolean;
+  progress: number;
+  assignments: { assignmentId: string; instruction: string | null; reopenedForEditing: boolean; items: DayDetailItem[] }[];
+};
 type CalendarDay = { day: number; progress: number };
 type HistoryData = {
   year: number;
@@ -52,6 +85,8 @@ export default function HistoryPage() {
   const [month, setMonth] = useState(now.getMonth() + 1);
   const [data, setData] = useState<HistoryData | null>(null);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
+  const [dayDetail, setDayDetail] = useState<DayDetail | null>(null);
+  const [dayDetailLoading, setDayDetailLoading] = useState(false);
 
   async function load(y: number, m: number) {
     const res = await fetch(`/api/student/history?year=${y}&month=${m}`);
@@ -93,7 +128,22 @@ export default function HistoryPage() {
 
   function openDay(d: number) {
     const dateStr = `${year}-${pad2(month)}-${pad2(d)}`;
-    setSelectedDate((prev) => (prev === dateStr ? null : dateStr));
+    setSelectedDate((prev) => {
+      const next = prev === dateStr ? null : dateStr;
+      if (next) {
+        setDayDetailLoading(true);
+        setDayDetail(null);
+        fetch(`/api/student/day?date=${next}`)
+          .then((r) => (r.ok ? r.json() : null))
+          .then((d) => {
+            setDayDetail(d);
+            setDayDetailLoading(false);
+          });
+      } else {
+        setDayDetail(null);
+      }
+      return next;
+    });
   }
 
   const visibleRecords = selectedDate
@@ -248,50 +298,173 @@ export default function HistoryPage() {
           </div>
         )}
 
-        {visibleRecords.map((rec) => (
-          <div key={rec.date} style={{ marginBottom: 20 }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-              <div style={{ fontSize: 13, fontWeight: 700, color: colors.navy }}>{formatDateLabel(rec.date)}</div>
-              <div style={{ fontSize: 12, color: colors.textSecondary }}>
-                {rec.completedCount}개 완료
+        {!selectedDate &&
+          visibleRecords.map((rec) => (
+            <div key={rec.date} style={{ marginBottom: 20 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                <div style={{ fontSize: 13, fontWeight: 700, color: colors.navy }}>{formatDateLabel(rec.date)}</div>
+                <div style={{ fontSize: 12, color: colors.textSecondary }}>{rec.completedCount}개 완료</div>
               </div>
-            </div>
-            {rec.items.map((item) => (
-              <div
-                key={item.assignedItemId}
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                  background: colors.card,
-                  borderRadius: 14,
-                  padding: "12px 16px",
-                  marginBottom: 8,
-                  boxShadow: "0 2px 10px rgba(21,42,84,0.05)",
-                }}
-              >
-                <div>
-                  <div style={{ fontSize: 14, fontWeight: 700, color: colors.navy }}>{item.title}</div>
-                  {item.hasScore && item.maxScore != null && (
-                    <div style={{ fontSize: 12, color: colors.textSecondary, marginTop: 2 }}>
-                      {item.score ?? "-"} / {item.maxScore}점
-                    </div>
-                  )}
-                  {item.hasCount && (
-                    <div style={{ fontSize: 12, color: colors.textSecondary, marginTop: 2 }}>
-                      {item.currentCount} / {item.targetCount}회
-                    </div>
+              {rec.items.map((item) => (
+                <div
+                  key={item.assignedItemId}
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    background: colors.card,
+                    borderRadius: 14,
+                    padding: "12px 16px",
+                    marginBottom: 8,
+                    boxShadow: "0 2px 10px rgba(21,42,84,0.05)",
+                  }}
+                >
+                  <div>
+                    <div style={{ fontSize: 14, fontWeight: 700, color: colors.navy }}>{item.title}</div>
+                    {item.hasScore && item.maxScore != null && (
+                      <div style={{ fontSize: 12, color: colors.textSecondary, marginTop: 2 }}>
+                        {item.score ?? "-"} / {item.maxScore}점
+                      </div>
+                    )}
+                    {item.hasCount && (
+                      <div style={{ fontSize: 12, color: colors.textSecondary, marginTop: 2 }}>
+                        {item.currentCount} / {item.targetCount}회
+                      </div>
+                    )}
+                  </div>
+                  {item.completed ? (
+                    <span style={{ color: colors.green, fontSize: 13, fontWeight: 700 }}>✅ 완료</span>
+                  ) : (
+                    <span style={{ color: colors.textMuted, fontSize: 13, fontWeight: 700 }}>미완료</span>
                   )}
                 </div>
-                {item.completed ? (
-                  <span style={{ color: colors.green, fontSize: 13, fontWeight: 700 }}>✅ 완료</span>
-                ) : (
-                  <span style={{ color: colors.textMuted, fontSize: 13, fontWeight: 700 }}>미완료</span>
-                )}
-              </div>
-            ))}
+              ))}
+            </div>
+          ))}
+
+        {selectedDate && (
+          <div style={{ marginBottom: 20 }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: colors.navy, marginBottom: 8 }}>
+              {formatDateLabel(selectedDate)}
+            </div>
+
+            {dayDetailLoading && <p style={{ color: colors.textSecondary, fontSize: 13 }}>불러오는 중...</p>}
+
+            {!dayDetailLoading &&
+              dayDetail?.assignments.map((a) => (
+                <div key={a.assignmentId} style={{ marginBottom: 14 }}>
+                  {a.reopenedForEditing && (
+                    <div
+                      style={{
+                        background: "#fff7e6",
+                        border: "1px solid #f0b429",
+                        borderRadius: 10,
+                        padding: 10,
+                        marginBottom: 8,
+                        fontSize: 12,
+                        color: colors.navy,
+                      }}
+                    >
+                      🔓 선생님이 이 날짜 기록을 다시 열어주셨어요 — 지금 다시 체크하거나 제출할 수 있어요.
+                    </div>
+                  )}
+                  {a.instruction && (
+                    <div
+                      style={{
+                        background: colors.blueLight,
+                        borderRadius: 10,
+                        padding: 12,
+                        marginBottom: 8,
+                        fontSize: 13,
+                        color: colors.navy,
+                        whiteSpace: "pre-wrap",
+                      }}
+                    >
+                      📢 {a.instruction}
+                    </div>
+                  )}
+                  {a.items.map((item) => (
+                    <div
+                      key={item.assignedItemId}
+                      style={{
+                        background: colors.card,
+                        borderRadius: 14,
+                        padding: "14px 16px",
+                        marginBottom: 8,
+                        boxShadow: "0 2px 10px rgba(21,42,84,0.05)",
+                      }}
+                    >
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+                        <div style={{ fontSize: 14, fontWeight: 700, color: colors.navy }}>{item.title}</div>
+                        {item.completed ? (
+                          <span style={{ color: colors.green, fontSize: 13, fontWeight: 700 }}>✅ 완료</span>
+                        ) : (
+                          <span style={{ color: colors.textMuted, fontSize: 13, fontWeight: 700 }}>미완료</span>
+                        )}
+                      </div>
+                      {item.hasScore && item.maxScore != null && (
+                        <div style={{ fontSize: 12, color: colors.textSecondary, marginBottom: 4 }}>
+                          {item.score ?? "-"} / {item.maxScore}점
+                        </div>
+                      )}
+                      {item.hasCount && (
+                        <div style={{ fontSize: 12, color: colors.textSecondary, marginBottom: 4 }}>
+                          {item.currentCount} / {item.targetCount}회
+                        </div>
+                      )}
+
+                      {item.hasPhotoSubmission && item.photoUrl && (
+                        <div style={{ marginTop: 6 }}>
+                          {item.photoMimeType === "application/pdf" ? (
+                            <a href={item.photoUrl} target="_blank" rel="noreferrer" style={{ fontSize: 13, color: colors.blue }}>
+                              📄 {item.photoFilename || "제출 PDF 보기"}
+                            </a>
+                          ) : (
+                            <img src={item.photoUrl} alt="제출 사진" style={{ maxWidth: "100%", borderRadius: 10 }} />
+                          )}
+                        </div>
+                      )}
+                      {item.hasAudioSubmission && item.audioUrl && (
+                        <div style={{ marginTop: 6 }}>
+                          <audio controls src={item.audioUrl} style={{ width: "100%" }} />
+                        </div>
+                      )}
+                      {item.hasVideoSubmission && item.videoUrl && (
+                        <div style={{ marginTop: 6 }}>
+                          <video controls src={item.videoUrl} style={{ width: "100%", maxHeight: 320, borderRadius: 10 }} />
+                        </div>
+                      )}
+                      {item.hasFileSubmission && item.fileUrl && (
+                        <div style={{ marginTop: 6 }}>
+                          <a href={item.fileUrl} target="_blank" rel="noreferrer" style={{ fontSize: 13, color: colors.blue }}>
+                            📎 {item.fileFilename || "제출 파일 열기"}
+                          </a>
+                        </div>
+                      )}
+                      {a.reopenedForEditing && (
+                        <Link
+                          href={`/student/item/${item.assignedItemId}`}
+                          style={{
+                            display: "inline-block",
+                            marginTop: 10,
+                            fontSize: 13,
+                            fontWeight: 700,
+                            color: colors.blue,
+                            border: `1px solid ${colors.blue}`,
+                            borderRadius: 999,
+                            padding: "6px 14px",
+                            textDecoration: "none",
+                          }}
+                        >
+                          다시 체크/제출하러 가기
+                        </Link>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              ))}
           </div>
-        ))}
+        )}
       </div>
       <BottomNav />
     </div>

@@ -1,23 +1,20 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { getAdminFromRequest } from "@/lib/adminAuth";
+import { getStudentFromRequest } from "@/lib/studentAuth";
 import { getSignedDownloadUrl } from "@/lib/storage";
 import { isAcademyToday } from "@/lib/timezone";
 
 /**
- * 관리자가 특정 학생의 "특정 날짜" 체크리스트(제출물 포함)를 조회한다.
- * /api/admin/students/[id]/today와 로직은 같되, 오늘이 아니라 쿼리로 받은
- * date(YYYY-MM-DD)를 기준으로 과거/미래 날짜도 조회할 수 있다.
+ * 로그인한 학생 본인의 "특정 날짜" 체크리스트를 제출물(사진/음성/영상/파일)까지 포함해
+ * 조회한다. /api/admin/students/[id]/day 와 로직은 같되, 세션의 본인 학생으로 범위가
+ * 고정된다. ?date=YYYY-MM-DD
  */
-export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
-  const admin = await getAdminFromRequest(req);
-  if (!admin) return NextResponse.json({ error: "관리자 로그인이 필요합니다." }, { status: 401 });
+export async function GET(req: NextRequest) {
+  const student = await getStudentFromRequest(req);
+  if (!student) return NextResponse.json({ error: "로그인이 필요합니다." }, { status: 401 });
 
   const dateStr = req.nextUrl.searchParams.get("date");
   if (!dateStr) return NextResponse.json({ error: "date 쿼리가 필요합니다." }, { status: 400 });
-
-  const student = await prisma.student.findUnique({ where: { studentId: params.id } });
-  if (!student) return NextResponse.json({ error: "존재하지 않는 학생입니다." }, { status: 404 });
 
   const checklistDate = new Date(`${dateStr}T00:00:00.000Z`);
 
@@ -46,6 +43,7 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
   const assignmentsOut = await Promise.all(
     assignments.map(async (a) => ({
       assignmentId: a.assignmentId,
+      instruction: a.instruction,
       reopenedForEditing: a.reopenedForEditing,
       items: await Promise.all(
         a.items.map(async (item) => {
@@ -88,7 +86,6 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
   );
 
   return NextResponse.json({
-    studentName: student.name,
     date: dateStr,
     isToday: isAcademyToday(dateStr),
     progress,
