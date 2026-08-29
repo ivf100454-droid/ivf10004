@@ -290,6 +290,15 @@ export default function StatusPage() {
       progressByDay[d.day] = d.progress;
     });
 
+    const todayNow = new Date();
+    const todayY = todayNow.getFullYear();
+    const todayM = todayNow.getMonth() + 1;
+    const todayD = todayNow.getDate();
+    const isPastOrToday = (d: number) =>
+      calYear < todayY ||
+      (calYear === todayY && calMonth < todayM) ||
+      (calYear === todayY && calMonth === todayM && d <= todayD);
+
     return (
       <div style={{ maxWidth: 480, margin: "24px auto", padding: 16, fontFamily: "sans-serif" }}>
         <button onClick={() => setScreen("students")} style={{ marginBottom: 16, padding: "6px 12px", fontSize: 13 }}>
@@ -317,7 +326,9 @@ export default function StatusPage() {
         </div>
 
         <p style={{ fontSize: 12, color: "#888", marginBottom: 8 }}>
-          날짜 안 숫자는 그날의 진행률입니다 (10% 이상이면 파란색으로 표시). 날짜를 누르면 그날 제출한 자료를 볼 수 있어요.
+          오늘 날짜는 진한 테두리로 표시돼요. 날짜 안 숫자는 그날의 진행률입니다 (10% 이상이면
+          파란색). 월~금인데 체크리스트를 못했으면 빨간 테두리로 미완료 표시돼요 (토·일은
+          제외). 날짜를 누르면 그날 제출한 자료를 볼 수 있어요.
         </p>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
           <button onClick={() => navMonth(-1)} style={{ padding: "6px 12px" }}>
@@ -334,6 +345,10 @@ export default function StatusPage() {
           {cells.map((d, i) => {
             const progress = d ? progressByDay[d] : undefined;
             const isActive = progress !== undefined && progress >= 10;
+            const isToday = !!d && calYear === todayY && calMonth === todayM && d === todayD;
+            const weekday = d ? new Date(calYear, calMonth - 1, d).getDay() : -1;
+            const isWeekday = weekday >= 1 && weekday <= 5;
+            const isIncomplete = !!d && isWeekday && isPastOrToday(d) && !isActive;
             return (
               <button
                 key={i}
@@ -346,17 +361,18 @@ export default function StatusPage() {
                   alignItems: "center",
                   justifyContent: "center",
                   borderRadius: "50%",
-                  border: "none",
+                  border: isIncomplete ? "2px solid #FF5A75" : "none",
+                  boxShadow: isToday ? "0 0 0 2px #152A54" : "none",
                   cursor: d ? "pointer" : "default",
                   background: isActive ? "#4a90d9" : "transparent",
-                  color: isActive ? "#fff" : "#333",
+                  color: isActive ? "#fff" : isIncomplete ? "#FF5A75" : "#333",
                 }}
               >
                 {d ? (
                   isActive ? (
                     <span style={{ fontSize: 11, fontWeight: 600, lineHeight: 1.1 }}>{progress}%</span>
                   ) : (
-                    <span style={{ fontSize: 13 }}>{d}</span>
+                    <span style={{ fontSize: 13, fontWeight: isIncomplete ? 700 : 400 }}>{d}</span>
                   )
                 ) : (
                   ""
