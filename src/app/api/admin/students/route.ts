@@ -13,6 +13,7 @@ export async function GET(req: NextRequest) {
     where: classId ? { currentClassId: classId } : undefined,
     include: {
       account: { select: { loginId: true, accountStatus: true } },
+      currentClass: { select: { name: true } },
     },
     orderBy: { sortOrder: "asc" },
   });

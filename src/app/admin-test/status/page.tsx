@@ -2,8 +2,13 @@
 
 import { useEffect, useState } from "react";
 
-type ClassItem = { classId: string; name: string; sortOrder: number; studentCount: number };
-type Student = { studentId: string; name: string; currentClassId: string | null };
+type Student = {
+  studentId: string;
+  name: string;
+  currentClassId: string | null;
+  studentStatus: string;
+  currentClass: { name: string } | null;
+};
 
 type AssignedItem = {
   assignedItemId: string;
@@ -60,11 +65,10 @@ export default function StatusPage() {
   const [password, setPassword] = useState("");
   const [loginMsg, setLoginMsg] = useState("");
 
-  const [classes, setClasses] = useState<ClassItem[]>([]);
   const [students, setStudents] = useState<Student[]>([]);
+  const [todayProgress, setTodayProgress] = useState<Record<string, number>>({});
 
-  const [screen, setScreen] = useState<"classes" | "students" | "detail" | "day">("classes");
-  const [activeClassId, setActiveClassId] = useState("");
+  const [screen, setScreen] = useState<"students" | "detail" | "day">("students");
   const [activeStudentId, setActiveStudentId] = useState("");
 
   const [today, setToday] = useState<TodayData | null>(null);
@@ -82,14 +86,17 @@ export default function StatusPage() {
   const [dayShareUrl, setDayShareUrl] = useState("");
 
   async function refreshBase() {
-    const [cRes, sRes] = await Promise.all([fetch("/api/admin/classes"), fetch("/api/admin/students")]);
-    if (cRes.status === 401) {
+    const [sRes, pRes] = await Promise.all([
+      fetch("/api/admin/students"),
+      fetch("/api/admin/students/today-progress"),
+    ]);
+    if (sRes.status === 401) {
       setLoggedIn(false);
       return;
     }
     setLoggedIn(true);
-    setClasses(await cRes.json());
     setStudents(await sRes.json());
+    if (pRes.ok) setTodayProgress(await pRes.json());
   }
 
   useEffect(() => {
@@ -112,11 +119,6 @@ export default function StatusPage() {
       const data = await res.json().catch(() => ({}));
       setLoginMsg(data.error || "로그인 실패");
     }
-  }
-
-  function openClass(classId: string) {
-    setActiveClassId(classId);
-    setScreen("students");
   }
 
   async function loadCalendar(studentId: string, year: number, month: number) {
@@ -271,34 +273,6 @@ export default function StatusPage() {
           </button>
         </form>
         {loginMsg && <p style={{ color: "crimson" }}>{loginMsg}</p>}
-      </div>
-    );
-  }
-
-  if (screen === "students") {
-    const cls = classes.find((c) => c.classId === activeClassId);
-    const list = students.filter((s) => s.currentClassId === activeClassId);
-    return (
-      <div style={{ maxWidth: 480, margin: "24px auto", padding: 16, fontFamily: "sans-serif" }}>
-        <button onClick={() => setScreen("classes")} style={{ marginBottom: 16, padding: "6px 12px", fontSize: 13 }}>
-          ← 수업 목록으로
-        </button>
-        <h1 style={{ fontSize: 20, marginBottom: 16 }}>{cls?.name}</h1>
-        {list.length === 0 ? (
-          <p style={{ color: "#888" }}>이 수업에 배치된 학생이 없습니다.</p>
-        ) : (
-          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-            {list.map((s) => (
-              <button
-                key={s.studentId}
-                onClick={() => openStudent(s.studentId)}
-                style={{ textAlign: "left", padding: "12px 14px", fontSize: 15 }}
-              >
-                {s.name}
-              </button>
-            ))}
-          </div>
-        )}
       </div>
     );
   }
@@ -585,23 +559,39 @@ export default function StatusPage() {
     );
   }
 
+  const activeStudents = students.filter((s) => s.studentStatus !== "withdrawn");
+
   return (
     <div style={{ maxWidth: 480, margin: "24px auto", padding: 16, fontFamily: "sans-serif" }}>
       <h1 style={{ fontSize: 20, marginBottom: 16 }}>체크리스트 완료 현황</h1>
-      {classes.length === 0 ? (
-        <p style={{ color: "#888" }}>아직 생성된 수업이 없습니다.</p>
+      {activeStudents.length === 0 ? (
+        <p style={{ color: "#888" }}>아직 등록된 학생이 없습니다.</p>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-          {classes.map((c) => (
-            <button
-              key={c.classId}
-              onClick={() => openClass(c.classId)}
-              style={{ textAlign: "left", padding: "12px 14px", display: "flex", justifyContent: "space-between", alignItems: "center" }}
-            >
-              <span style={{ fontSize: 15, fontWeight: 500 }}>{c.name}</span>
-              <span style={{ fontSize: 13, color: "#888" }}>{c.studentCount}명 ›</span>
-            </button>
-          ))}
+          {activeStudents.map((s) => {
+            const pct = todayProgress[s.studentId] ?? 0;
+            return (
+              <button
+                key={s.studentId}
+                onClick={() => openStudent(s.studentId)}
+                style={{ textAlign: "left", padding: "12px 14px", display: "flex", justifyContent: "space-between", alignItems: "center" }}
+              >
+                <span style={{ display: "flex", flexDirection: "column" }}>
+                  <span style={{ fontSize: 15, fontWeight: 500 }}>{s.name}</span>
+                  {s.currentClass && <span style={{ fontSize: 12, color: "#aaa" }}>{s.currentClass.name}</span>}
+                </span>
+                <span
+                  style={{
+                    fontSize: 14,
+                    fontWeight: 700,
+                    color: pct >= 100 ? "#22b573" : pct > 0 ? "#2f6feb" : "#bbb",
+                  }}
+                >
+                  오늘 {pct}% ›
+                </span>
+              </button>
+            );
+          })}
         </div>
       )}
     </div>
