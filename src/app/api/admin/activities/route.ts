@@ -23,6 +23,7 @@ async function serializeActivity(a: {
   hasAudioSubmission: boolean;
   hasVideoSubmission: boolean;
   hasFileSubmission: boolean;
+  hasQrScan: boolean;
   materialLinkUrl: string | null;
   materialVideo: { videoId: string; title: string } | null;
   materialPhotoFile: { storageKey: string; originalFilename: string } | null;
@@ -40,6 +41,7 @@ async function serializeActivity(a: {
     hasAudioSubmission: a.hasAudioSubmission,
     hasVideoSubmission: a.hasVideoSubmission,
     hasFileSubmission: a.hasFileSubmission,
+    hasQrScan: a.hasQrScan,
     materialLinkUrl: a.materialLinkUrl,
     materialVideo: a.materialVideo ? { videoId: a.materialVideo.videoId, title: a.materialVideo.title } : null,
     materialPhotoUrl: a.materialPhotoFile ? await getSignedDownloadUrl(a.materialPhotoFile.storageKey, 600) : null,
@@ -85,6 +87,7 @@ export async function POST(req: NextRequest) {
   const hasAudioSubmission = toBool(formData.get("hasAudioSubmission"));
   const hasVideoSubmission = toBool(formData.get("hasVideoSubmission"));
   const hasFileSubmission = toBool(formData.get("hasFileSubmission"));
+  const hasQrScan = toBool(formData.get("hasQrScan"));
 
   if (hasCount && (!targetCount || targetCount < 1)) {
     return NextResponse.json({ error: "목표 횟수를 입력하세요." }, { status: 400 });
@@ -93,7 +96,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "만점을 입력하세요 (10 이상)." }, { status: 400 });
   }
 
-  const anySubmit = hasCheck || hasCount || hasScore || hasPhotoSubmission || hasAudioSubmission || hasVideoSubmission || hasFileSubmission;
+  const anySubmit = hasCheck || hasCount || hasScore || hasPhotoSubmission || hasAudioSubmission || hasVideoSubmission || hasFileSubmission || hasQrScan;
 
   const materialLinkUrl = String(formData.get("materialLinkUrl") || "").trim() || null;
   const materialVideoId = String(formData.get("materialVideoId") || "").trim() || null;
@@ -172,6 +175,7 @@ export async function POST(req: NextRequest) {
         hasAudioSubmission: hasAudioSubmission,
         hasVideoSubmission: hasVideoSubmission,
         hasFileSubmission: hasFileSubmission,
+        hasQrScan: hasQrScan,
         materialLinkUrl: materialLinkUrl,
         materialVideoId: materialVideoId,
         materialPhotoFileId: materialPhotoFileId,
