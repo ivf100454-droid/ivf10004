@@ -12,7 +12,8 @@ function evaluateCompleted(
   hasCurrentPhoto: boolean,
   hasCurrentAudio: boolean,
   hasCurrentVideo: boolean,
-  hasCurrentFile: boolean
+  hasCurrentFile: boolean,
+  hasQrScanDone: boolean
 ) {
   if (required.length === 0) return checked === true;
   return required.every(function (feature) {
@@ -23,6 +24,7 @@ function evaluateCompleted(
     if (feature === "audioSubmission") return hasCurrentAudio;
     if (feature === "videoSubmission") return hasCurrentVideo;
     if (feature === "fileSubmission") return hasCurrentFile;
+    if (feature === "qrScan") return hasQrScanDone;
     return false;
   });
 }
@@ -76,7 +78,8 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     !!currentPhoto,
     !!currentAudio,
     !!currentVideo,
-    !!currentFile
+    !!currentFile,
+    !!item.qrScannedAt
   );
 
   const updated = await prisma.assignedChecklistItem.update({
