@@ -77,6 +77,7 @@ async function ensureAssignmentForRecurring(
             hasAudioSubmission: item.hasAudioSubmission,
             hasVideoSubmission: item.hasVideoSubmission,
             hasFileSubmission: item.hasFileSubmission,
+                        hasQrScan: item.hasQrScan,
             requiredFeatures: item.requiredFeatures as any,
           })),
         },
