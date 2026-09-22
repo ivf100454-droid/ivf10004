@@ -45,6 +45,7 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
             if (a.hasAudioSubmission) required.push("audioSubmission");
             if (a.hasVideoSubmission) required.push("videoSubmission");
             if (a.hasFileSubmission) required.push("fileSubmission");
+            if (a.hasQrScan) required.push("qrScan");
 
             return {
               activityId: a.activityId,
@@ -61,6 +62,7 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
               hasAudioSubmission: a.hasAudioSubmission,
               hasVideoSubmission: a.hasVideoSubmission,
               hasFileSubmission: a.hasFileSubmission,
+              hasQrScan: a.hasQrScan,
               requiredFeatures: required,
             };
           }),
