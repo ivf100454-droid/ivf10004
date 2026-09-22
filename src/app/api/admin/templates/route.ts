@@ -56,6 +56,7 @@ export async function POST(req: NextRequest) {
           if (a.hasAudioSubmission) required.push("audioSubmission");
           if (a.hasVideoSubmission) required.push("videoSubmission");
           if (a.hasFileSubmission) required.push("fileSubmission");
+          if (a.hasQrScan) required.push("qrScan");
 
           return {
             activityId: a.activityId,
@@ -72,6 +73,7 @@ export async function POST(req: NextRequest) {
             hasAudioSubmission: a.hasAudioSubmission,
             hasVideoSubmission: a.hasVideoSubmission,
             hasFileSubmission: a.hasFileSubmission,
+            hasQrScan: a.hasQrScan,
             requiredFeatures: required,
           };
         }),
