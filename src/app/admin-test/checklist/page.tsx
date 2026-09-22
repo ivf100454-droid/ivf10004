@@ -47,6 +47,9 @@ type AssignedItem = {
   hasAudioSubmission: boolean;
   hasVideoSubmission: boolean;
   hasFileSubmission: boolean;
+  hasQrScan: boolean;
+  qrScannedUrl?: string | null;
+  qrScannedAt?: string | null;
   completed: boolean;
   teachingVideo: { title: string; url: string } | null;
 };
@@ -687,6 +690,11 @@ export default function ChecklistTestPage() {
         method: "DELETE",
       }).catch(function () {});
     }
+    if (item.hasQrScan) {
+      await fetch("/api/admin/assigned-items/" + item.assignedItemId + "/qr", {
+        method: "DELETE",
+      }).catch(function () {});
+    }
     await loadToday(activeViewStudentId);
   }
 
@@ -1143,6 +1151,18 @@ export default function ChecklistTestPage() {
                   {item.hasVideoSubmission && <VideoUploader assignedItemId={item.assignedItemId} onDone={function () { loadToday(activeViewStudentId); }} />}
 
                   {item.hasFileSubmission && <FileUploader assignedItemId={item.assignedItemId} onDone={function () { loadToday(activeViewStudentId); }} />}
+
+                  {item.hasQrScan && (
+                    <div style={{ fontSize: 13, color: colors.textSecondary, marginBottom: 4 }}>
+                      📱 QR 스캔: {item.qrScannedUrl ? (
+                        <a href={item.qrScannedUrl} target="_blank" rel="noreferrer" style={{ color: colors.blue }}>
+                          스캔됨 (링크 열기)
+                        </a>
+                      ) : (
+                        "미스캔 (학생이 앱에서 직접 스캔)"
+                      )}
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
@@ -1152,3 +1172,4 @@ export default function ChecklistTestPage() {
     </div>
   );
 }
+
