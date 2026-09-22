@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { colors, fontFamily, getItemVisual } from "../../theme";
@@ -24,6 +24,9 @@ type AssignedItem = {
   hasAudioSubmission: boolean;
   hasVideoSubmission: boolean;
   hasFileSubmission: boolean;
+  hasQrScan: boolean;
+  qrScannedUrl: string | null;
+  qrScannedAt: string | null;
   completed: boolean;
   teachingVideo: TeachingVideo | null;
 };
@@ -272,6 +275,182 @@ function SubmissionBlock(props: {
   );
 }
 
+function QrScanBlock(props: { assignedItemId: string; scannedUrl: string | null; onDone: () => void }) {
+  const [scanning, setScanning] = useState(false);
+  const [error, setError] = useState("");
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+  const rafRef = useRef<number | null>(null);
+
+  function stopCamera() {
+    if (rafRef.current) cancelAnimationFrame(rafRef.current);
+    rafRef.current = null;
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach((t) => t.stop());
+      streamRef.current = null;
+    }
+    setScanning(false);
+  }
+
+  useEffect(() => {
+    return () => stopCamera();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  async function startScan() {
+    setError("");
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: "environment" },
+      });
+      streamRef.current = stream;
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        await videoRef.current.play();
+      }
+      setScanning(true);
+      tick();
+    } catch (e) {
+      setError("카메라를 사용할 수 없어요. 카메라 권한을 허용해주세요.");
+    }
+  }
+
+  async function tick() {
+    const jsQR = (await import("jsqr")).default;
+    const video = videoRef.current;
+    const canvas = canvasRef.current;
+    if (!video || !canvas || video.readyState !== video.HAVE_ENOUGH_DATA) {
+      rafRef.current = requestAnimationFrame(tick);
+      return;
+    }
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) {
+      rafRef.current = requestAnimationFrame(tick);
+      return;
+    }
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    const code = jsQR(imageData.data, imageData.width, imageData.height);
+    if (code && code.data) {
+      stopCamera();
+      await handleScanned(code.data);
+      return;
+    }
+    rafRef.current = requestAnimationFrame(tick);
+  }
+
+  async function handleScanned(text: string) {
+    const res = await fetch(`/api/student/assigned-items/${props.assignedItemId}/qr`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ url: text }),
+    });
+    if (res.ok) {
+      if (/^https?:\/\//i.test(text)) {
+        window.open(text, "_blank", "noreferrer");
+      }
+      props.onDone();
+    } else {
+      const data = await res.json().catch(() => ({}));
+      setError("실패: " + (data.error || "다시 시도해주세요."));
+    }
+  }
+
+  async function handleRescan() {
+    await startScan();
+  }
+
+  return (
+    <div style={{ background: colors.card, borderRadius: 20, padding: 20, marginBottom: 14, boxShadow: "0 2px 10px rgba(21,42,84,0.05)" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16 }}>
+        <div
+          style={{
+            width: 44,
+            height: 44,
+            borderRadius: 12,
+            background: colors.blueLight,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            fontSize: 22,
+          }}
+        >
+          📱
+        </div>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontSize: 16, fontWeight: 800, color: colors.navy }}>QR 스캔</div>
+        </div>
+        <span
+          style={{
+            fontSize: 12,
+            fontWeight: 700,
+            color: props.scannedUrl ? colors.green : colors.textMuted,
+            background: props.scannedUrl ? colors.greenLight : colors.bg,
+            borderRadius: 999,
+            padding: "5px 12px",
+          }}
+        >
+          {props.scannedUrl ? "스캔 완료 ✓" : "미스캔"}
+        </span>
+      </div>
+
+      {props.scannedUrl && !scanning && (
+        <div style={{ marginBottom: 14 }}>
+          <a
+            href={props.scannedUrl}
+            target="_blank"
+            rel="noreferrer"
+            style={{ fontSize: 13, color: colors.blue, display: "block", marginBottom: 10, wordBreak: "break-all" }}
+          >
+            🔗 스캔한 링크 다시 열기
+          </a>
+          <button
+            onClick={handleRescan}
+            style={{ fontSize: 12, color: colors.pink, background: "none", border: "none" }}
+          >
+            다시 스캔하기
+          </button>
+        </div>
+      )}
+
+      <div style={{ display: scanning ? "block" : "none", marginBottom: 12 }}>
+        <video ref={videoRef} playsInline muted style={{ width: "100%", borderRadius: 12, background: "#000" }} />
+        <canvas ref={canvasRef} style={{ display: "none" }} />
+        <button
+          onClick={stopCamera}
+          style={{ marginTop: 8, width: "100%", padding: 12, fontSize: 14, fontWeight: 700, color: colors.navy, background: colors.bg, border: `1px solid ${colors.border}`, borderRadius: 12 }}
+        >
+          취소
+        </button>
+      </div>
+
+      {!props.scannedUrl && !scanning && (
+        <button
+          onClick={startScan}
+          style={{
+            width: "100%",
+            padding: 14,
+            fontSize: 15,
+            fontWeight: 700,
+            color: "#fff",
+            background: colors.blueGradient,
+            border: "none",
+            borderRadius: 12,
+          }}
+        >
+          📷 QR 찍기
+        </button>
+      )}
+
+      {error && <p style={{ fontSize: 12, color: colors.pink, marginTop: 8 }}>{error}</p>}
+      <p style={{ fontSize: 11, color: colors.textMuted, marginTop: 10 }}>📖 책에 인쇄된 QR코드를 카메라로 비춰주세요.</p>
+    </div>
+  );
+}
+
 export default function ItemDetailPage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
@@ -481,12 +660,16 @@ export default function ItemDetailPage() {
         {item.hasFileSubmission && (
           <SubmissionBlock assignedItemId={item.assignedItemId} kind="file" submitted={item.completed || false} onDone={load} />
         )}
+        {item.hasQrScan && (
+          <QrScanBlock assignedItemId={item.assignedItemId} scannedUrl={item.qrScannedUrl} onDone={load} />
+        )}
 
         {(item.hasCheck || item.hasCount || item.hasScore) &&
           !item.hasPhotoSubmission &&
           !item.hasAudioSubmission &&
           !item.hasVideoSubmission &&
-          !item.hasFileSubmission && (
+          !item.hasFileSubmission &&
+          !item.hasQrScan && (
             <button
               onClick={() => {
                 if (item.hasCheck) patchItem({ checked: true });
@@ -511,3 +694,4 @@ export default function ItemDetailPage() {
     </div>
   );
 }
+
