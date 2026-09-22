@@ -20,6 +20,7 @@ type AssignedItem = {
   hasAudioSubmission: boolean;
   hasVideoSubmission: boolean;
   hasFileSubmission: boolean;
+  hasQrScan: boolean;
   completed: boolean;
 };
 type Assignment = { assignmentId: string; instruction: string | null; items: AssignedItem[] };
@@ -262,3 +263,4 @@ export default function ChecklistPage() {
     </div>
   );
 }
+
