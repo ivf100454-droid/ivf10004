@@ -20,6 +20,7 @@ type AssignedItem = {
   hasAudioSubmission: boolean;
   hasVideoSubmission: boolean;
   hasFileSubmission: boolean;
+  hasQrScan: boolean;
   completed: boolean;
 };
 type Assignment = { assignmentId: string; items: AssignedItem[] };
@@ -37,6 +38,9 @@ function statusLabel(item: AssignedItem) {
   if (item.completed) return { text: "완료", tone: "done" as const };
   if (item.hasPhotoSubmission || item.hasAudioSubmission || item.hasVideoSubmission || item.hasFileSubmission) {
     return { text: "제출하기", tone: "todo" as const };
+  }
+  if (item.hasQrScan) {
+    return { text: "QR 찍기", tone: "todo" as const };
   }
   return { text: "시작하기", tone: "todo" as const };
 }
@@ -433,3 +437,4 @@ export default function StudentPage() {
     </div>
   );
 }
+
