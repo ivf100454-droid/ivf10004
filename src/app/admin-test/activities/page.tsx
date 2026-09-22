@@ -17,6 +17,7 @@ type Activity = {
   hasAudioSubmission: boolean;
   hasVideoSubmission: boolean;
   hasFileSubmission: boolean;
+  hasQrScan: boolean;
   materialLinkUrl: string | null;
   materialVideo: { videoId: string; title: string } | null;
   materialPhotoUrl: string | null;
@@ -36,6 +37,7 @@ type Draft = {
   hasAudioSubmission: boolean;
   hasVideoSubmission: boolean;
   hasFileSubmission: boolean;
+  hasQrScan: boolean;
   materialLinkUrl: string;
   materialVideoId: string;
   materialPhotoFile: File | null;
@@ -56,6 +58,7 @@ function emptyDraft(): Draft {
     hasAudioSubmission: false,
     hasVideoSubmission: false,
     hasFileSubmission: false,
+    hasQrScan: false,
     materialLinkUrl: "",
     materialVideoId: "",
     materialPhotoFile: null,
@@ -73,6 +76,7 @@ const SUBMIT_FEATURES: { key: keyof Draft; label: string }[] = [
   { key: "hasVideoSubmission", label: "🎬 영상 제출" },
   { key: "hasAudioSubmission", label: "🎤 음성 제출" },
   { key: "hasFileSubmission", label: "📄 파일 제출" },
+  { key: "hasQrScan", label: "📱 QR 스캔" },
 ];
 
 const card: React.CSSProperties = {
@@ -180,6 +184,7 @@ export default function ActivitiesPage() {
       hasAudioSubmission: a.hasAudioSubmission,
       hasVideoSubmission: a.hasVideoSubmission,
       hasFileSubmission: a.hasFileSubmission,
+      hasQrScan: a.hasQrScan,
       materialLinkUrl: a.materialLinkUrl || "",
       materialVideoId: a.materialVideo ? a.materialVideo.videoId : "",
       materialPhotoFile: null,
@@ -208,7 +213,8 @@ export default function ActivitiesPage() {
     }
     const anySubmit =
       draft.hasCheck || draft.hasCount || draft.hasScore || draft.hasPhotoSubmission ||
-      draft.hasAudioSubmission || draft.hasVideoSubmission || draft.hasFileSubmission;
+      draft.hasAudioSubmission || draft.hasVideoSubmission || draft.hasFileSubmission ||
+      draft.hasQrScan;
     const anyMaterial = !!draft.materialLinkUrl.trim() || !!draft.materialVideoId || !!draft.materialPhotoFile || !!draft.materialDocFile;
     if (!anySubmit && !anyMaterial && mode === "add") {
       setMsg("최소 하나의 항목을 선택하세요.");
@@ -229,6 +235,7 @@ export default function ActivitiesPage() {
     fd.append("hasAudioSubmission", String(draft.hasAudioSubmission));
     fd.append("hasVideoSubmission", String(draft.hasVideoSubmission));
     fd.append("hasFileSubmission", String(draft.hasFileSubmission));
+    fd.append("hasQrScan", String(draft.hasQrScan));
     fd.append("materialLinkUrl", draft.materialLinkUrl.trim());
     fd.append("materialVideoId", draft.materialVideoId);
     if (draft.materialPhotoFile) fd.append("materialPhotoFile", draft.materialPhotoFile);
@@ -421,6 +428,7 @@ export default function ActivitiesPage() {
             a.hasVideoSubmission && "🎬",
             a.hasAudioSubmission && "🎤",
             a.hasFileSubmission && "📄",
+            a.hasQrScan && "📱",
             a.materialLinkUrl && "🔗",
             a.materialVideo && "📺",
             a.materialPhotoUrl && "🖼️",
