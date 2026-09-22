@@ -176,6 +176,7 @@ model Activity {
   hasAudioSubmission Boolean @default(false) @map("has_audio_submission")
   hasVideoSubmission Boolean @default(false) @map("has_video_submission")
   hasFileSubmission  Boolean @default(false) @map("has_file_submission")
+  hasQrScan          Boolean @default(false) @map("has_qr_scan")
 
   materialLinkUrl     String? @map("material_link_url")
   materialVideoId     String? @map("material_video_id")
@@ -242,6 +243,7 @@ model TemplateItem {
   hasAudioSubmission  Boolean @default(false) @map("has_audio_submission")
   hasVideoSubmission  Boolean @default(false) @map("has_video_submission")
   hasFileSubmission   Boolean @default(false) @map("has_file_submission")
+  hasQrScan           Boolean @default(false) @map("has_qr_scan")
 
   // 완료 조건에 포함할 기능들의 목록. 예: ["check","count","videoSubmission"]
   // (11번 요구사항: 단순 열람 요소인 link/teachingVideo는 이 목록에 넣지 않는 것이 기본.)
@@ -306,40 +308,21 @@ model ChecklistAssignment {
   createdByAdmin    Administrator? @relation(fields: [createdByAdminId], references: [adminId], onDelete: SetNull)
   createdAt         DateTime @default(now()) @map("created_at")
 
-  // 이 배정이 "반 기본 템플릿"에서 자동 생성된 것인지("class"), 학생 "개별 고정 배정"에서
-  // 자동 생성된 것인지("individual")를 구분한다. 반과 개별은 서로 덮어쓰지 않고
-  // 같은 날 함께 존재할 수 있다 — 개별 배정은 "반 체크리스트에 추가로 얹는" 용도.
-  // 관리자가 옛 방식으로 만든 배정이나 수동 배정은 null로 남는다.
   standingSource    String?  @map("standing_source")
 
-  // 이 일일 체크리스트를 생성한 반복배정(RecurringAssignment). 자동 생성분에만 값이 있고,
-  // 수동/레거시 배정은 null이다. (studentId, recurringAssignmentId, checklistDate) 조합에
-  // 유니크 제약을 걸어 같은 반복배정이 하루에 두 번 생성되는 것을 DB 레벨에서 방지한다.
   recurringAssignmentId String?              @map("recurring_assignment_id")
   recurringAssignment    RecurringAssignment? @relation(fields: [recurringAssignmentId], references: [recurringAssignmentId], onDelete: SetNull)
 
-  // 생성 당시 템플릿의 버전 번호 스냅샷. 이후 템플릿이 수정되어 버전이 올라가도 이 값과
-  // 아래 items의 내용은 그대로 유지된다 (과거 기록 불변).
   templateVersion Int? @map("template_version")
 
-  // 생성 당시 템플릿의 "오늘의 안내문" 스냅샷. 이후 템플릿의 안내문이 바뀌어도 이미 생성된
-  // 이 배정의 안내문은 그대로 유지된다.
   instruction String? @map("instruction")
 
-  // 표시용 일련번호 (jump1-1, jump1-2 ...) — 반복배정별로 1부터 증가. DB 식별자로는 쓰지 않는다.
   sequenceNumber Int? @map("sequence_number")
 
-  // 기본적으로 "오늘" 날짜가 아닌 배정은 학생·관리자 모두 수정할 수 없다 (과거 기록 보존).
-  // 관리자가 특정 학생의 특정 날짜 기록을 다시 열어줘야 할 때만 이 값을 true로 켠다 —
-  // 켜져 있는 동안은 오늘이 아니어도 체크/점수/제출 파일을 다시 고칠 수 있다.
   reopenedForEditing Boolean @default(false) @map("reopened_for_editing")
 
-  // true면 30일 보존기간이 지나도 자동 정리(삭제) 대상에서 제외한다. 관리자가 특별히
-  // 보관해야 하는 기록을 켜둘 수 있다.
   preservedByAdmin Boolean @default(false) @map("preserved_by_admin")
 
-  // 관리자가 학생의 그날 학습을 확인하고 "확인 완료"를 누른 시점 — 학생별 월간 캘린더에
-  // 파란색으로 표시하는 기준이 된다(진행률 100%와는 별개의 "관리자 리뷰 완료" 개념).
   reviewedAt        DateTime? @map("reviewed_at")
   reviewedByAdminId String?   @map("reviewed_by_admin_id")
 
@@ -360,7 +343,6 @@ model AssignedChecklistItem {
   isProgressItem Boolean  @default(true) @map("is_progress_item")
   status         AssignmentItemStatus @default(active)
 
-  // 기능 플래그 — template_items와 동일 구조 (배정 시 값 복사).
   hasCheck           Boolean @default(false) @map("has_check")
   hasCount           Boolean @default(false) @map("has_count")
   targetCount        Int?    @map("target_count")
@@ -374,9 +356,12 @@ model AssignedChecklistItem {
   hasAudioSubmission Boolean @default(false) @map("has_audio_submission")
   hasVideoSubmission Boolean @default(false) @map("has_video_submission")
   hasFileSubmission  Boolean @default(false) @map("has_file_submission")
+  hasQrScan          Boolean @default(false) @map("has_qr_scan")
   requiredFeatures   Json @default("[]") @map("required_features")
 
-  // 아래부터는 "진행 상태" — 학생/관리자가 실제로 입력·제출하며 채워지는 값들.
+  qrScannedUrl String?   @map("qr_scanned_url")
+  qrScannedAt  DateTime? @map("qr_scanned_at")
+
   checked         Boolean   @default(false)
   currentCount    Int       @default(0) @map("current_count")
   score           Int?
@@ -400,11 +385,11 @@ model AssignedChecklistItem {
 
 model FileMetadata {
   fileId           String   @id @default(uuid()) @map("file_id")
-  storageKey       String   @map("storage_key") // R2 object key
+  storageKey       String   @map("storage_key")
   originalFilename String   @map("original_filename")
   mimeType         String   @map("mime_type")
   sizeBytes        Int      @map("size_bytes")
-  uploadedBy       String   @map("uploaded_by") // account_id or admin_id
+  uploadedBy       String   @map("uploaded_by")
   uploadedAt       DateTime @default(now()) @map("uploaded_at")
 
   imageAttachments       ImageAttachment[]
@@ -419,8 +404,6 @@ model FileMetadata {
   @@map("file_metadata")
 }
 
-/// 관리자가 항목에 첨부하는 학습자료 이미지(문법설명자료, 단어장 등).
-/// 학생이 제출하는 사진(PhotoSubmission)과는 반대 방향이라 별도 모델로 분리.
 model ImageAttachment {
   imageAttachmentId String   @id @default(uuid()) @map("image_attachment_id")
 
@@ -451,8 +434,6 @@ model AudioSubmission {
   @@map("audio_submissions")
 }
 
-/// 학생이 제출하는 시험지/숙제 사진. current/superseded 버전 관리는
-/// AudioSubmission과 동일한 패턴(당일 재제출 가능, 과거 제출본은 보존).
 model PhotoSubmission {
   submissionId   String   @id @default(uuid()) @map("submission_id")
   assignedItemId String   @map("assigned_item_id")
@@ -467,8 +448,6 @@ model PhotoSubmission {
   @@map("photo_submissions")
 }
 
-/// 학생이 제출하는 영상(팝송 부르기, 말하기 연습 등). 관리자가 올리는
-/// TeachingVideo와는 방향이 반대이므로 완전히 다른 테이블로 분리한다.
 model VideoSubmission {
   submissionId    String   @id @default(uuid()) @map("submission_id")
   assignedItemId  String   @map("assigned_item_id")
@@ -484,9 +463,6 @@ model VideoSubmission {
   @@map("video_submissions")
 }
 
-/// 학생이 제출하는 범용 파일 제출("파일 제출" 아이콘). 사진/음성/영상 제출과 달리
-/// 형식을 가리지 않고(이미지, PDF, 음성, 영상, 문서 등 무엇이든) 받는 용도이며,
-/// 다른 제출 모델들과 동일한 current/superseded 패턴을 따른다.
 model FileSubmission {
   submissionId   String   @id @default(uuid()) @map("submission_id")
   assignedItemId String   @map("assigned_item_id")
@@ -501,16 +477,12 @@ model FileSubmission {
   @@map("file_submissions")
 }
 
-/// 학부모 공유 링크. 로그인 없이 토큰만으로 특정 학생의 특정 날짜 학습결과를
-/// 읽기 전용으로 볼 수 있게 한다(7번 요구사항). 다른 학생 정보에는 절대 접근 불가.
 model ShareLink {
   shareLinkId      String    @id @default(uuid()) @map("share_link_id")
   token            String    @unique
   studentId        String    @map("student_id")
   student          Student   @relation(fields: [studentId], references: [studentId], onDelete: Cascade)
   checklistDate    DateTime  @map("checklist_date") @db.Date
-  // 며칠치를 보여줄지. 1(기본값)=기존처럼 그 날 하루만. 7=checklistDate를 시작일로 한
-  // 일주일치 요약 리포트("학부모용 주간 요약 리포트").
   rangeDays        Int       @default(1) @map("range_days")
   createdByAdminId String?   @map("created_by_admin_id")
   createdByAdmin   Administrator? @relation(fields: [createdByAdminId], references: [adminId], onDelete: SetNull)
@@ -531,19 +503,16 @@ model IdempotencyKey {
   @@map("idempotency_keys")
 }
 
-/// 30일 보존기간 자동 정리 실행 기록(감사 로그). 삭제된 배정은 DB에서 사라지므로,
-/// "언제 누구의 어떤 날짜 기록이 왜(성공/실패) 정리됐는지"를 별도로 남겨둔다.
-/// assignmentId는 삭제된 뒤에도 남아야 하므로 FK로 걸지 않는다.
 model RetentionAuditLog {
   logId            String   @id @default(uuid()) @map("log_id")
   assignmentId     String   @map("assignment_id")
   studentId        String   @map("student_id")
   studentName      String   @map("student_name")
   checklistDate    DateTime @map("checklist_date") @db.Date
-  status           String   @map("status") // "success" | "failed"
+  status           String   @map("status")
   deletedFileCount Int      @default(0) @map("deleted_file_count")
   detail           String?  @map("detail")
-  triggeredBy      String   @map("triggered_by") // "manual" | "cron"
+  triggeredBy      String   @map("triggered_by")
   createdAt        DateTime @default(now()) @map("created_at")
 
   @@index([checklistDate])
