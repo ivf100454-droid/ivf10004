@@ -46,6 +46,7 @@ export type ItemLike = {
   hasAudioSubmission: boolean;
   hasVideoSubmission: boolean;
   hasFileSubmission: boolean;
+  hasQrScan: boolean;
 };
 
 // 활동 성격에 따라 홈/목록 화면에 쓸 아이콘·배경색을 정한다.
@@ -55,14 +56,15 @@ export function getItemVisual(item: ItemLike): { emoji: string; bg: string } {
   if (item.hasAudioSubmission) return { emoji: "🎵", bg: "#FFE4E9" };
   if (item.hasPhotoSubmission) return { emoji: "📷", bg: colors.blueLight };
   if (item.hasFileSubmission) return { emoji: "📎", bg: colors.blueLight };
+  if (item.hasQrScan) return { emoji: "📱", bg: colors.blueLight };
   if (item.hasCount) return { emoji: "📘", bg: colors.orangeLight };
   return { emoji: "✏️", bg: colors.greenLight };
 }
 
-// 이 항목이 "제출형"(사진/음성/영상/파일)인지, "학습형"(체크/횟수/점수)인지 구분한다.
+// 이 항목이 "제출형"(사진/음성/영상/파일/QR)인지, "학습형"(체크/횟수/점수)인지 구분한다.
 export function isSubmissionItem(item: ItemLike): boolean {
   return (
-    (item.hasPhotoSubmission || item.hasAudioSubmission || item.hasVideoSubmission || item.hasFileSubmission) &&
+    (item.hasPhotoSubmission || item.hasAudioSubmission || item.hasVideoSubmission || item.hasFileSubmission || item.hasQrScan) &&
     !item.hasCheck &&
     !item.hasCount &&
     !item.hasScore
