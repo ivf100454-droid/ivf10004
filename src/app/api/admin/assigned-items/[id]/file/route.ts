@@ -13,7 +13,8 @@ function evaluateCompleted(
   currentCount: number,
   targetCount: number | null,
   score: number | null,
-  justSubmittedFile: boolean
+  justSubmittedFile: boolean,
+  hasQrScanDone: boolean
 ) {
   if (required.length === 0) return checked === true;
   return required.every(function (feature) {
@@ -24,6 +25,7 @@ function evaluateCompleted(
     if (feature === "audioSubmission") return false;
     if (feature === "videoSubmission") return false;
     if (feature === "fileSubmission") return justSubmittedFile;
+    if (feature === "qrScan") return hasQrScanDone;
     return false;
   });
 }
@@ -71,7 +73,8 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     item.currentCount,
     item.targetCount,
     item.score,
-    true
+    true,
+    !!item.qrScannedAt
   );
 
   const submissionId = await prisma.$transaction(async function (tx) {
@@ -166,7 +169,8 @@ export async function DELETE(req: NextRequest, { params }: { params: { id: strin
     item.currentCount,
     item.targetCount,
     item.score,
-    false
+    false,
+    !!item.qrScannedAt
   );
 
   await prisma.$transaction(async function (tx) {
