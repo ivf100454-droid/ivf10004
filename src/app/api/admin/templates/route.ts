@@ -6,7 +6,10 @@ export async function GET(req: NextRequest) {
   const admin = await getAdminFromRequest(req);
   if (!admin) return NextResponse.json({ error: "관리자 로그인이 필요합니다." }, { status: 401 });
 
+  // 기본은 숨은 묶음(활동 배정 시 자동 생성)을 빼고 보여준다. ?includeHidden=1 이면 전부.
+  const includeHidden = req.nextUrl.searchParams.get("includeHidden") === "1";
   const templates = await prisma.checklistTemplate.findMany({
+    where: includeHidden ? undefined : { isHidden: false },
     include: { items: { orderBy: { sortOrder: "asc" } } },
     orderBy: { createdAt: "desc" },
   });
@@ -44,6 +47,7 @@ export async function POST(req: NextRequest) {
   const template = await prisma.checklistTemplate.create({
     data: {
       name: name,
+      isHidden: body?.hidden === true,
       instruction: typeof body?.instruction === "string" && body.instruction.trim() ? body.instruction.trim() : null,
       items: {
         create: activityIds.map((activityId, i) => {

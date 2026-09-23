@@ -9,9 +9,13 @@ type Student = {
   studentStatus: string;
   currentClassId: string | null;
   standingTemplateId: string | null;
-  standingTemplate: { name: string } | null;
+  standingTemplate: { name: string; templateId: string } | null;
 };
-type Template = { templateId: string; name: string; items: { templateItemId: string }[] };
+type Template = {
+  templateId: string;
+  name: string;
+  items: { templateItemId: string; activityId: string | null; title: string }[];
+};
 type ClassRow = {
   classId: string;
   name: string;
@@ -60,6 +64,131 @@ type Assignment = {
   instruction: string | null;
 };
 type TodayData = { assignments: Assignment[]; progress: number };
+type ActivityRow = {
+  activityId: string;
+  name: string;
+  hasCheck: boolean;
+  hasCount: boolean;
+  hasScore: boolean;
+  hasPhotoSubmission: boolean;
+  hasAudioSubmission: boolean;
+  hasVideoSubmission: boolean;
+  hasFileSubmission: boolean;
+  hasQrScan: boolean;
+};
+
+function activityIcons(a: ActivityRow) {
+  return [
+    a.hasCheck && "✅",
+    a.hasCount && "🔢",
+    a.hasScore && "💯",
+    a.hasPhotoSubmission && "📷",
+    a.hasAudioSubmission && "🎤",
+    a.hasVideoSubmission && "🎬",
+    a.hasFileSubmission && "📎",
+    a.hasQrScan && "📱",
+  ]
+    .filter(Boolean)
+    .join(" ");
+}
+
+function sameList(a: string[], b: string[]) {
+  return a.length === b.length && a.every((x, i) => x === b[i]);
+}
+
+/** "활동 배정" 버튼 — 누르면 활동 만들기에서 만들어둔 활동 목록이 펼쳐지고, 체크해서 고른다. */
+function ActivityPicker(props: {
+  activities: ActivityRow[];
+  picked: string[];
+  onChange: (ids: string[]) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  function toggle(id: string) {
+    if (props.picked.includes(id)) props.onChange(props.picked.filter((x) => x !== id));
+    else props.onChange([...props.picked, id]);
+  }
+  const pickedNames = props.picked
+    .map((id) => props.activities.find((a) => a.activityId === id)?.name)
+    .filter(Boolean);
+  return (
+    <div>
+      <button
+        type="button"
+        onClick={() => setOpen(!open)}
+        style={{
+          ...box,
+          textAlign: "left",
+          background: colors.card,
+          cursor: "pointer",
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          gap: 8,
+          color: props.picked.length ? colors.navy : colors.textSecondary,
+          fontWeight: props.picked.length ? 700 : 400,
+        }}
+      >
+        <span>
+          📋 활동 배정
+          {props.picked.length
+            ? " — " + props.picked.length + "개: " + pickedNames.join(", ")
+            : " (눌러서 활동 고르기)"}
+        </span>
+        <span>{open ? "▲" : "▼"}</span>
+      </button>
+      {open && (
+        <div
+          style={{
+            marginTop: 6,
+            border: `1px solid ${colors.border}`,
+            borderRadius: 10,
+            maxHeight: 340,
+            overflowY: "auto",
+            background: colors.bg,
+          }}
+        >
+          {props.activities.length === 0 ? (
+            <p style={{ fontSize: 13, color: colors.textSecondary, padding: 12, margin: 0 }}>
+              아직 만든 활동이 없어요.{" "}
+              <a href="/admin-test/activities" style={{ color: colors.blue }}>
+                활동 만들기
+              </a>
+              에서 먼저 만들어주세요.
+            </p>
+          ) : (
+            props.activities.map((a) => {
+              const idx = props.picked.indexOf(a.activityId);
+              return (
+                <label
+                  key={a.activityId}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 10,
+                    padding: "12px",
+                    borderBottom: `1px solid ${colors.border}`,
+                    background: idx >= 0 ? colors.blueLight : "transparent",
+                    cursor: "pointer",
+                  }}
+                >
+                  <input
+                    type="checkbox"
+                    checked={idx >= 0}
+                    onChange={() => toggle(a.activityId)}
+                    style={{ width: 20, height: 20 }}
+                  />
+                  <span style={{ flex: 1, fontSize: 14, fontWeight: 600, color: colors.navy }}>{a.name}</span>
+                  <span style={{ fontSize: 12 }}>{activityIcons(a)}</span>
+                  {idx >= 0 && <span style={{ fontSize: 11, color: colors.blue, fontWeight: 700 }}>{idx + 1}번</span>}
+                </label>
+              );
+            })
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
 
 const card: React.CSSProperties = {
   background: colors.card,
@@ -471,14 +600,15 @@ export default function ChecklistTestPage() {
   const [students, setStudents] = useState<Student[]>([]);
   const [templates, setTemplates] = useState<Template[]>([]);
   const [classes, setClasses] = useState<ClassRow[]>([]);
+  const [activities, setActivities] = useState<ActivityRow[]>([]);
+  const [studentActivityIds, setStudentActivityIds] = useState<string[]>([]);
+  const [classActivityIds, setClassActivityIds] = useState<string[]>([]);
 
   const [selectedStudentId, setSelectedStudentId] = useState("");
-  const [selectedStudentTemplateId, setSelectedStudentTemplateId] = useState("");
   const [assignStudentMsg, setAssignStudentMsg] = useState("");
   const [studentRecurring, setStudentRecurring] = useState<RecurringRow[]>([]);
 
   const [selectedClassId, setSelectedClassId] = useState("");
-  const [selectedClassTemplateId, setSelectedClassTemplateId] = useState("");
   const [assignClassMsg, setAssignClassMsg] = useState("");
   const [classRecurring, setClassRecurring] = useState<RecurringRow[]>([]);
 
@@ -494,7 +624,7 @@ export default function ChecklistTestPage() {
 
   async function refreshBase() {
     const sRes = await fetch("/api/admin/students");
-    const tRes = await fetch("/api/admin/templates");
+    const tRes = await fetch("/api/admin/templates?includeHidden=1");
     const cRes = await fetch("/api/admin/classes");
     if (sRes.status === 401) {
       setLoggedIn(false);
@@ -504,6 +634,36 @@ export default function ChecklistTestPage() {
     setStudents(await sRes.json());
     setTemplates(await tRes.json());
     setClasses(await cRes.json());
+    const aRes = await fetch("/api/admin/activities");
+    if (aRes.ok) setActivities(await aRes.json());
+  }
+
+  /** 배정(템플릿 묶음)에 들어있는 활동 ID 목록 — 삭제된 활동은 빠진다. */
+  function activityIdsOf(templateId: string | null | undefined): string[] {
+    if (!templateId) return [];
+    const t = templates.find((x) => x.templateId === templateId);
+    if (!t) return [];
+    return t.items.map((i) => i.activityId).filter((x): x is string => !!x);
+  }
+
+  /** 배정에 들어있는 활동 이름들 (목록 표시용). */
+  function activityNamesOf(templateId: string | null | undefined): string {
+    if (!templateId) return "";
+    const t = templates.find((x) => x.templateId === templateId);
+    if (!t) return "";
+    return t.items.map((i) => i.title).join(", ");
+  }
+
+  /** 고른 활동들로 숨은 묶음을 자동으로 만들어 templateId를 돌려준다. */
+  async function createBundleFromActivities(name: string, activityIds: string[]) {
+    const res = await fetch("/api/admin/templates", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name, activityIds, hidden: true }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || "배정을 만들지 못했습니다.");
+    return data.templateId as string;
   }
 
   useEffect(() => {
@@ -598,23 +758,48 @@ export default function ChecklistTestPage() {
 
   async function handleAssignStudent(e: React.FormEvent) {
     e.preventDefault();
+    await assignStudent(false);
+  }
+
+  async function assignStudent(clear: boolean) {
     setAssignStudentMsg("");
     if (!selectedStudentId) {
       setAssignStudentMsg("학생을 선택해주세요.");
       return;
     }
+    const st = students.find((x) => x.studentId === selectedStudentId);
+    let templateId = "";
+    if (!clear) {
+      if (studentActivityIds.length === 0) {
+        setAssignStudentMsg("'활동 배정'을 눌러 활동을 하나 이상 골라주세요.");
+        return;
+      }
+      if (st?.standingTemplate && sameList(activityIdsOf(st.standingTemplate.templateId), studentActivityIds)) {
+        setAssignStudentMsg("이미 이 활동들로 배정되어 있어요. (변경 없음)");
+        return;
+      }
+      try {
+        templateId = await createBundleFromActivities("[개별] " + (st ? st.name : "학생"), studentActivityIds);
+      } catch (err: any) {
+        setAssignStudentMsg("실패: " + err.message);
+        return;
+      }
+    } else if (!confirm("이 학생의 개별 배정을 해제할까요? (반 배정은 그대로 유지됩니다)")) {
+      return;
+    }
     const res = await fetch("/api/admin/assignments", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ studentId: selectedStudentId, templateId: selectedStudentTemplateId }),
+      body: JSON.stringify({ studentId: selectedStudentId, templateId }),
     });
     const data = await res.json().catch(() => ({}));
     if (res.ok) {
       setAssignStudentMsg(
-        selectedStudentTemplateId
-          ? "개별 추가 배정 완료 (항목 " + (data.items ? data.items.length : 0) + "개) — 반 체크리스트는 그대로 유지되고, 이 학생에게만 매일 자동으로 추가됩니다."
-          : "개별 배정을 해제했습니다. (반 기본 체크리스트는 그대로 유지됩니다.)"
+        templateId
+          ? "활동 " + studentActivityIds.length + "개 배정 완료 — 이 학생에게 매일 자동으로 생성됩니다. (반 배정은 그대로 유지)"
+          : "개별 배정을 해제했습니다. (반 배정은 그대로 유지됩니다.)"
       );
+      if (!templateId) setStudentActivityIds([]);
       await refreshBase();
       if (activeViewStudentId === selectedStudentId) {
         await loadToday(selectedStudentId);
@@ -627,23 +812,48 @@ export default function ChecklistTestPage() {
 
   async function handleAssignClass(e: React.FormEvent) {
     e.preventDefault();
+    await assignClass(false);
+  }
+
+  async function assignClass(clear: boolean) {
     setAssignClassMsg("");
     if (!selectedClassId) {
       setAssignClassMsg("클래스를 선택해주세요.");
       return;
     }
+    const c = classes.find((x) => x.classId === selectedClassId);
+    let templateId = "";
+    if (!clear) {
+      if (classActivityIds.length === 0) {
+        setAssignClassMsg("'활동 배정'을 눌러 활동을 하나 이상 골라주세요.");
+        return;
+      }
+      if (c?.templateId && sameList(activityIdsOf(c.templateId), classActivityIds)) {
+        setAssignClassMsg("이미 이 활동들로 배정되어 있어요. (변경 없음)");
+        return;
+      }
+      try {
+        templateId = await createBundleFromActivities("[반] " + (c ? c.name : "클래스"), classActivityIds);
+      } catch (err: any) {
+        setAssignClassMsg("실패: " + err.message);
+        return;
+      }
+    } else if (!confirm("이 클래스의 배정을 해제할까요?")) {
+      return;
+    }
     const res = await fetch("/api/admin/assignments/class", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ classId: selectedClassId, templateId: selectedClassTemplateId }),
+      body: JSON.stringify({ classId: selectedClassId, templateId }),
     });
     const data = await res.json().catch(() => ({}));
     if (res.ok) {
       setAssignClassMsg(
-        selectedClassTemplateId
-          ? "클래스 전체 반 배정 완료 (" + data.studentCount + "명 반, 오늘자 신규 생성 " + data.todayGeneratedCount + "명) — 개별 추가 배정된 학생은 그 위에 개별 체크리스트도 그대로 유지됩니다."
-          : "반 기본 템플릿을 해제했습니다."
+        templateId
+          ? "클래스 전체 배정 완료 (" + data.studentCount + "명, 활동 " + classActivityIds.length + "개) — 매일 자동으로 생성됩니다."
+          : "클래스 배정을 해제했습니다."
       );
+      if (!templateId) setClassActivityIds([]);
       await refreshBase();
       if (activeViewStudentId) await loadToday(activeViewStudentId);
       await loadClassRecurring(selectedClassId);
@@ -778,31 +988,29 @@ export default function ChecklistTestPage() {
         <form onSubmit={handleAssignStudent} style={{ display: "flex", flexDirection: "column", gap: 10 }}>
           <select
             value={selectedStudentId}
-            onChange={(e) => setSelectedStudentId(e.target.value)}
+            onChange={(e) => {
+              const id = e.target.value;
+              setSelectedStudentId(id);
+              setAssignStudentMsg("");
+              const st = students.find((x) => x.studentId === id);
+              setStudentActivityIds(activityIdsOf(st?.standingTemplate?.templateId));
+            }}
             style={box}
           >
             <option value="">학생 선택</option>
             {activeStudents.map((s) => (
               <option key={s.studentId} value={s.studentId}>
                 {s.name}
-                {s.standingTemplate ? " (개별: " + s.standingTemplate.name + ")" : ""}
+                {s.standingTemplate ? " (개별: " + activityNamesOf(s.standingTemplate.templateId) + ")" : ""}
               </option>
             ))}
           </select>
-          <select
-            value={selectedStudentTemplateId}
-            onChange={(e) => setSelectedStudentTemplateId(e.target.value)}
-            style={box}
-          >
-            <option value="">선택 안함 (개별 배정 해제)</option>
-            {templates.map((t) => (
-              <option key={t.templateId} value={t.templateId}>
-                {t.name} ({t.items.length}개 항목)
-              </option>
-            ))}
-          </select>
+          <ActivityPicker activities={activities} picked={studentActivityIds} onChange={setStudentActivityIds} />
           <button type="submit" style={primaryBtn}>
             이 학생에게 개별 배정
+          </button>
+          <button type="button" style={{ ...smallDangerBtn, alignSelf: "flex-end" }} onClick={() => assignStudent(true)}>
+            개별 배정 해제
           </button>
         </form>
         {assignStudentMsg && <p style={{ fontSize: 13, color: colors.blue, marginTop: 8 }}>{assignStudentMsg}</p>}
@@ -812,7 +1020,7 @@ export default function ChecklistTestPage() {
             style={{ marginTop: 10, padding: 10, borderRadius: 8, background: colors.bg, fontSize: 12 }}
           >
             <div style={{ marginBottom: 6 }}>
-              <strong>{ra.templateName}</strong> ·{" "}
+              <strong>{activityNamesOf(ra.templateId) || ra.templateName}</strong> ·{" "}
               {ra.status === "active" ? "🟢 진행 중" : "⏸ 일시정지"} · 시작 {String(ra.startDate).slice(0, 10)} ·
               지금까지 {ra.sequenceCounter}회 생성
             </div>
@@ -843,30 +1051,28 @@ export default function ChecklistTestPage() {
         <form onSubmit={handleAssignClass} style={{ display: "flex", flexDirection: "column", gap: 10 }}>
           <select
             value={selectedClassId}
-            onChange={(e) => setSelectedClassId(e.target.value)}
+            onChange={(e) => {
+              const id = e.target.value;
+              setSelectedClassId(id);
+              setAssignClassMsg("");
+              const c = classes.find((x) => x.classId === id);
+              setClassActivityIds(activityIdsOf(c?.templateId));
+            }}
             style={box}
           >
             <option value="">클래스 선택</option>
             {classes.map((c) => (
               <option key={c.classId} value={c.classId}>
-                {c.name} ({c.studentCount}명){c.templateName ? " — 현재: " + c.templateName : ""}
+                {c.name} ({c.studentCount}명){c.templateId ? " — 현재: " + activityNamesOf(c.templateId) : ""}
               </option>
             ))}
           </select>
-          <select
-            value={selectedClassTemplateId}
-            onChange={(e) => setSelectedClassTemplateId(e.target.value)}
-            style={box}
-          >
-            <option value="">선택 안함 (반 기본 템플릿 해제)</option>
-            {templates.map((t) => (
-              <option key={t.templateId} value={t.templateId}>
-                {t.name} ({t.items.length}개 항목)
-              </option>
-            ))}
-          </select>
+          <ActivityPicker activities={activities} picked={classActivityIds} onChange={setClassActivityIds} />
           <button type="submit" style={primaryBtn}>
             이 클래스 전체에 배정
+          </button>
+          <button type="button" style={{ ...smallDangerBtn, alignSelf: "flex-end" }} onClick={() => assignClass(true)}>
+            클래스 배정 해제
           </button>
         </form>
         {assignClassMsg && <p style={{ fontSize: 13, color: colors.blue, marginTop: 8 }}>{assignClassMsg}</p>}
@@ -876,7 +1082,7 @@ export default function ChecklistTestPage() {
             style={{ marginTop: 10, padding: 10, borderRadius: 8, background: colors.bg, fontSize: 12 }}
           >
             <div style={{ marginBottom: 6 }}>
-              <strong>{ra.templateName}</strong> ·{" "}
+              <strong>{activityNamesOf(ra.templateId) || ra.templateName}</strong> ·{" "}
               {ra.status === "active" ? "🟢 진행 중" : "⏸ 일시정지"} · 시작 {String(ra.startDate).slice(0, 10)} ·
               지금까지 {ra.sequenceCounter}회 생성
             </div>

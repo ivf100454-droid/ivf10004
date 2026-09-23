@@ -21,13 +21,13 @@ export async function GET(req: NextRequest) {
   // 개별 반복배정(활성/일시정지)이 있는 학생만 표시용 템플릿 이름을 붙여준다.
   const activeIndividual = await prisma.recurringAssignment.findMany({
     where: { targetType: "student", studentId: { in: students.map((s) => s.studentId) }, status: { in: ["active", "paused"] } },
-    include: { template: { select: { name: true } } },
+    include: { template: { select: { name: true, templateId: true } } },
     orderBy: { createdAt: "desc" },
   });
-  const standingByStudent = new Map<string, { name: string }>();
+  const standingByStudent = new Map<string, { name: string; templateId: string }>();
   for (const ra of activeIndividual) {
     if (ra.studentId && !standingByStudent.has(ra.studentId)) {
-      standingByStudent.set(ra.studentId, { name: ra.template.name });
+      standingByStudent.set(ra.studentId, { name: ra.template.name, templateId: ra.template.templateId });
     }
   }
 

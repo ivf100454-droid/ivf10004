@@ -9,7 +9,6 @@ const tabs = [
   { href: "/admin-test/classes", label: "수업", icon: "🏫" },
   { href: "/admin-test/students", label: "학생", icon: "🧑‍🎓" },
   { href: "/admin-test/activities", label: "활동", icon: "🧩" },
-  { href: "/admin-test/template-builder", label: "템플릿", icon: "📋" },
   { href: "/admin-test/checklist", label: "배정/확인", icon: "✅" },
   { href: "/admin-test/status", label: "완료 현황", icon: "📅" },
   { href: "/admin-test/teaching-videos", label: "학습영상", icon: "🎬" },

@@ -203,10 +203,17 @@ export async function DELETE(req: NextRequest, { params }: { params: { id: strin
   const existing = await prisma.activity.findUnique({ where: { activityId: params.id } });
   if (!existing) return NextResponse.json({ error: "존재하지 않는 활동입니다." }, { status: 404 });
 
-  const inUse = await prisma.templateItem.findFirst({ where: { activityId: params.id } });
+  // 지금 진행 중(활성/일시정지)인 배정에 들어있는 활동만 삭제를 막는다.
+  // 이미 끝난 배정이나 지난 기록은 항목 내용이 따로 복사되어 있어 삭제해도 그대로 남는다.
+  const inUse = await prisma.templateItem.findFirst({
+    where: {
+      activityId: params.id,
+      template: { recurringAssignments: { some: { status: { in: ["active", "paused"] } } } },
+    },
+  });
   if (inUse) {
     return NextResponse.json(
-      { error: "이 활동은 템플릿에서 사용 중이라 삭제할 수 없습니다. 먼저 템플릿에서 이 활동을 빼주세요." },
+      { error: "이 활동은 지금 학생/반에 배정되어 있어 삭제할 수 없습니다. 먼저 배정/확인 화면에서 이 활동을 빼고 다시 배정해주세요." },
       { status: 409 }
     );
   }

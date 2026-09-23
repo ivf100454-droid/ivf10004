@@ -202,6 +202,9 @@ model ChecklistTemplate {
   // 이미 생성된 일일 체크리스트는 생성 당시의 버전 번호(ChecklistAssignment.templateVersion)와
   // 항목 스냅샷을 그대로 유지하므로, 이후 템플릿을 고쳐도 과거 기록은 바뀌지 않는다.
   version    Int      @default(1)
+  // 배정 화면에서 활동을 골라 배정할 때 자동으로 만들어지는 "숨은 묶음"이면 true.
+  // 관리자 화면의 템플릿 목록에는 보이지 않는다 (활동 단위 배정 방식).
+  isHidden   Boolean  @default(false) @map("is_hidden")
   createdAt  DateTime @default(now()) @map("created_at")
 
   items       TemplateItem[]

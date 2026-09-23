@@ -8,8 +8,7 @@ const cards = [
   { href: "/admin-test/classes", icon: "🏫", title: "수업 관리", desc: "반을 만들고 관리해요" },
   { href: "/admin-test/students", icon: "🧑‍🎓", title: "학생 관리", desc: "학생 등록·아이디·수업 배치" },
   { href: "/admin-test/activities", icon: "🧩", title: "활동 관리", desc: "체크리스트에 담을 활동 만들기" },
-  { href: "/admin-test/template-builder", icon: "📋", title: "템플릿 관리", desc: "활동을 모아 템플릿으로 조립" },
-  { href: "/admin-test/checklist", icon: "✅", title: "체크리스트 배정", desc: "학생에게 오늘 배정·확인" },
+  { href: "/admin-test/checklist", icon: "✅", title: "체크리스트 배정", desc: "학생·반에 활동을 골라 배정" },
   { href: "/admin-test/status", icon: "📅", title: "완료 현황", desc: "날짜별 완료 상태 확인" },
   { href: "/admin-test/teaching-videos", icon: "🎬", title: "학습영상 관리", desc: "학습용 영상 자료 업로드" },
 ];

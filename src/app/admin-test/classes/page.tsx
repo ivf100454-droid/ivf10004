@@ -264,30 +264,16 @@ export default function ClassesPage() {
 
         <p style={{ fontSize: 14, fontWeight: 700, marginBottom: 8, color: colors.navy }}>체크리스트</p>
         <div style={{ ...card, padding: 14, marginBottom: 20 }}>
-          {editingClass.templateName ? (
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-              <span style={{ fontSize: 14, fontWeight: 600, color: colors.navy }}>{editingClass.templateName}</span>
-              <button onClick={() => setClassTemplate(null)} style={ghostBtn}>
-                연결 해제
-              </button>
-            </div>
-          ) : templates.length === 0 ? (
-            <p style={{ fontSize: 13, color: colors.textSecondary, margin: 0 }}>
-              아직 생성된 체크리스트 템플릿이 없습니다. 템플릿 생성 후 다시 시도하세요.
-            </p>
-          ) : (
-            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-              {templates.map((t) => (
-                <button
-                  key={t.templateId}
-                  onClick={() => setClassTemplate(t.templateId)}
-                  style={{ textAlign: "left", padding: 10, borderRadius: 8, border: `1px solid ${colors.border}`, background: colors.bg, cursor: "pointer", fontSize: 14, color: colors.navy }}
-                >
-                  {t.name}
-                </button>
-              ))}
-            </div>
-          )}
+          <p style={{ fontSize: 13, color: colors.textSecondary, margin: "0 0 10px" }}>
+            {editingClass.templateId ? "이 반에 활동이 배정되어 있어요." : "아직 이 반에 배정된 활동이 없어요."} 활동 배정·변경은
+            배정/확인 화면에서 해요.
+          </p>
+          <a
+            href="/admin-test/checklist"
+            style={{ display: "inline-block", fontSize: 13, fontWeight: 700, color: colors.blue, background: colors.blueLight, borderRadius: 8, padding: "8px 12px", textDecoration: "none" }}
+          >
+            📋 활동 배정하러 가기
+          </a>
         </div>
 
         {editMsg && <p style={{ fontSize: 13, color: colors.pink, marginBottom: 8 }}>{editMsg}</p>}
