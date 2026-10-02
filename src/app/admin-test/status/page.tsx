@@ -36,6 +36,9 @@ type DayItem = {
   hasAudioSubmission: boolean;
   hasVideoSubmission: boolean;
   hasFileSubmission: boolean;
+  hasQrScan?: boolean;
+  qrScannedUrl?: string | null;
+  qrScannedAt?: string | null;
   completed: boolean;
   photoUrl: string | null;
   photoMimeType: string | null;
@@ -84,6 +87,8 @@ export default function StatusPage() {
   const [dayDateStr, setDayDateStr] = useState("");
   const [dayShareMsg, setDayShareMsg] = useState("");
   const [dayShareUrl, setDayShareUrl] = useState("");
+  // 오늘 체크리스트 목록 옆에 제출 현황(횟수·점수·제출됨 표시)을 보여주기 위한 오늘 상세 데이터
+  const [todayDetail, setTodayDetail] = useState<DayData | null>(null);
 
   async function refreshBase() {
     const [sRes, pRes] = await Promise.all([
@@ -130,9 +135,13 @@ export default function StatusPage() {
   }
 
   async function loadToday(studentId: string) {
+    setTodayDetail(null);
     const res = await fetch(`/api/admin/students/${studentId}/today`);
     if (res.ok) {
-      setToday(await res.json());
+      const data: TodayData = await res.json();
+      setToday(data);
+      const dRes = await fetch(`/api/admin/students/${studentId}/day?date=${data.date}`);
+      if (dRes.ok) setTodayDetail(await dRes.json());
     }
   }
 
@@ -210,7 +219,11 @@ export default function StatusPage() {
   }
 
   async function openDay(d: number) {
-    const dateStr = `${calYear}-${pad2(calMonth)}-${pad2(d)}`;
+    await openDayByDate(`${calYear}-${pad2(calMonth)}-${pad2(d)}`);
+  }
+
+  /** 날짜 상세 화면을 연다. scrollToItemId가 있으면 그 항목 위치로 바로 스크롤한다. */
+  async function openDayByDate(dateStr: string, scrollToItemId?: string) {
     setDayDateStr(dateStr);
     setDayData(null);
     setDayShareMsg("");
@@ -219,6 +232,13 @@ export default function StatusPage() {
     const res = await fetch(`/api/admin/students/${activeStudentId}/day?date=${dateStr}`);
     if (res.ok) {
       setDayData(await res.json());
+      window.setTimeout(() => {
+        if (scrollToItemId) {
+          document.getElementById("day-item-" + scrollToItemId)?.scrollIntoView({ behavior: "smooth", block: "start" });
+        } else {
+          window.scrollTo(0, 0);
+        }
+      }, 50);
     }
   }
 
@@ -316,11 +336,49 @@ export default function StatusPage() {
                 <div style={{ width: `${today.progress}%`, background: "#4caf50", height: "100%" }} />
               </div>
               <p style={{ fontSize: 13, marginBottom: 10 }}>진행률 {today.progress}%</p>
-              {today.assignments.flatMap((a) => a.items).map((item) => (
-                <div key={item.assignedItemId} style={{ fontSize: 14, padding: "3px 0" }}>
-                  {item.completed ? "✅" : "⬜"} {item.title}
-                </div>
-              ))}
+              {(todayDetail ? todayDetail.assignments.flatMap((a) => a.items) : today.assignments.flatMap((a) => a.items)).map((item) => {
+                const d = item as Partial<DayItem> & AssignedItem;
+                const badges: string[] = [];
+                if (d.hasCount) badges.push(`${d.currentCount ?? 0}/${d.targetCount ?? 0}회`);
+                if (d.hasScore && d.score != null) badges.push(`${d.score}점`);
+                if (d.photoUrl) badges.push("📷 제출됨");
+                if (d.audioUrl) badges.push("🎤 제출됨");
+                if (d.videoUrl) badges.push("🎬 제출됨");
+                if (d.fileUrl) badges.push("📎 제출됨");
+                if (d.hasQrScan) badges.push(d.qrScannedAt ? "📱 스캔완료" : "📱 미스캔");
+                return (
+                  <button
+                    key={item.assignedItemId}
+                    type="button"
+                    onClick={() => openDayByDate(today.date, item.assignedItemId)}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      gap: 8,
+                      width: "100%",
+                      textAlign: "left",
+                      fontSize: 14,
+                      padding: "8px 10px",
+                      marginBottom: 4,
+                      background: "white",
+                      border: "1px solid #eee",
+                      borderRadius: 8,
+                      cursor: "pointer",
+                    }}
+                  >
+                    <span style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                      <span>
+                        {item.completed ? "✅" : "⬜"} {item.title}
+                      </span>
+                      {badges.length > 0 && (
+                        <span style={{ fontSize: 12, color: "#2f6feb" }}>{badges.join(" · ")}</span>
+                      )}
+                    </span>
+                    <span style={{ fontSize: 13, color: "#2f6feb", whiteSpace: "nowrap" }}>보기 ›</span>
+                  </button>
+                );
+              })}
             </>
           )}
         </div>
@@ -480,7 +538,9 @@ export default function StatusPage() {
                 {a.items.map((item) => (
                   <div
                     key={item.assignedItemId}
+                    id={"day-item-" + item.assignedItemId}
                     style={{
+                      scrollMarginTop: 16,
                       border: "1px solid #eee",
                       borderRadius: 8,
                       padding: 12,
@@ -504,6 +564,29 @@ export default function StatusPage() {
                     {item.hasScore && (
                       <div style={{ marginBottom: 6, fontSize: 14 }}>
                         점수: {item.score != null ? item.score : "-"} / {item.maxScore}점
+                      </div>
+                    )}
+                    {item.hasQrScan && (
+                      <div style={{ marginBottom: 6, fontSize: 14 }}>
+                        {item.qrScannedAt ? (
+                          <>
+                            📱 QR 스캔 완료
+                            {item.qrScannedUrl && (
+                              <>
+                                {" — "}
+                                {/^https?:\/\//.test(item.qrScannedUrl) ? (
+                                  <a href={item.qrScannedUrl} target="_blank" rel="noreferrer">
+                                    스캔한 내용 열기
+                                  </a>
+                                ) : (
+                                  <span style={{ color: "#555" }}>{item.qrScannedUrl}</span>
+                                )}
+                              </>
+                            )}
+                          </>
+                        ) : (
+                          "📱 QR 스캔: 미스캔"
+                        )}
                       </div>
                     )}
                     {item.linkUrl && (
