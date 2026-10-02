@@ -38,6 +38,32 @@ async function ensureAssignmentForRecurring(
   });
   if (!template) return false;
 
+  // 개별 배정이면, 같은 날 소속 반 배정에 이미 들어 있는 활동은 빼고 만든다 (같은 활동 중복 방지).
+  let itemsToCreate = template.items;
+  if (ra.targetType === "student" && studentSnapshot.currentClassId) {
+    const weekday = getWeekday(todayStr);
+    const classRecurring = await prisma.recurringAssignment.findMany({
+      where: {
+        targetType: "class",
+        classId: studentSnapshot.currentClassId,
+        status: "active",
+        startDate: { lte: todayDate },
+        OR: [{ endDate: null }, { endDate: { gte: todayDate } }],
+      },
+      include: { template: { include: { items: { select: { activityId: true, title: true } } } } },
+    });
+    const classItems = classRecurring
+      .filter((cra) => cra.activeDays.includes(weekday))
+      .flatMap((cra) => cra.template.items);
+    const classActivityIds = new Set(classItems.map((i) => i.activityId).filter((v): v is string => !!v));
+    const classTitles = new Set(classItems.map((i) => i.title));
+    itemsToCreate = template.items.filter((item) =>
+      item.activityId ? !classActivityIds.has(item.activityId) : !classTitles.has(item.title)
+    );
+    // 개별 배정의 활동이 전부 반 배정과 겹치면, 개별 체크리스트는 따로 만들지 않는다.
+    if (itemsToCreate.length === 0) return false;
+  }
+
   // 표시용 일련번호를 원자적으로 하나 증가시켜 발급받는다.
   const updatedRa = await prisma.recurringAssignment.update({
     where: { recurringAssignmentId: ra.recurringAssignmentId },
@@ -61,7 +87,7 @@ async function ensureAssignmentForRecurring(
         standingSource: ra.targetType === "class" ? "class" : "individual",
         createdByAdminId: null, // 시스템 자동 생성
         items: {
-          create: template.items.map((item) => ({
+          create: itemsToCreate.map((item) => ({
             title: item.title,
             sortOrder: item.sortOrder,
             isProgressItem: item.isProgressItem,
