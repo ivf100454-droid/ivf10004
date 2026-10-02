@@ -825,8 +825,12 @@ export default function ChecklistTestPage() {
     let templateId = "";
     if (!clear) {
       if (classActivityIds.length === 0) {
-        setAssignClassMsg("'활동 배정'을 눌러 활동을 하나 이상 골라주세요.");
-        return;
+        // 활동을 하나도 고르지 않고 배정 → 이 반의 배정 전체 삭제
+        if (!c?.templateId) {
+          setAssignClassMsg("'활동 배정'을 눌러 활동을 하나 이상 골라주세요.");
+          return;
+        }
+        return assignClass(true);
       }
       if (c?.templateId && sameList(activityIdsOf(c.templateId), classActivityIds)) {
         setAssignClassMsg("이미 이 활동들로 배정되어 있어요. (변경 없음)");
@@ -838,7 +842,7 @@ export default function ChecklistTestPage() {
         setAssignClassMsg("실패: " + err.message);
         return;
       }
-    } else if (!confirm("이 클래스의 배정을 해제할까요?")) {
+    } else if (!confirm("이 반의 배정을 전부 삭제할까요?\n\n오늘 이미 만들어진 반 체크리스트(학생들이 체크·제출한 기록 포함)도 함께 삭제되고, 내일부터도 나오지 않아요.")) {
       return;
     }
     const res = await fetch("/api/admin/assignments/class", {
@@ -851,7 +855,7 @@ export default function ChecklistTestPage() {
       setAssignClassMsg(
         templateId
           ? "클래스 전체 배정 완료 (" + data.studentCount + "명, 활동 " + classActivityIds.length + "개) — 매일 자동으로 생성됩니다."
-          : "클래스 배정을 해제했습니다."
+          : "이 반의 배정을 전부 삭제했습니다."
       );
       if (!templateId) setClassActivityIds([]);
       await refreshBase();
@@ -906,19 +910,6 @@ export default function ChecklistTestPage() {
       }).catch(function () {});
     }
     await loadToday(activeViewStudentId);
-  }
-
-  async function handleDeleteAssignment(assignmentId: string) {
-    if (!window.confirm("이 배정을 통째로 삭제하시겠어요? 안의 모든 항목과 제출 기록이 함께 삭제됩니다.")) return;
-    const res = await fetch("/api/admin/assignments/" + assignmentId, { method: "DELETE" });
-    const data = await res.json().catch(function () {
-      return {};
-    });
-    if (res.ok) {
-      await loadToday(activeViewStudentId);
-    } else {
-      alert("삭제 실패: " + data.error);
-    }
   }
 
   async function handleCreateShareLink() {
@@ -1225,13 +1216,6 @@ export default function ChecklistTestPage() {
                   </span>
                 )}
                 {!a.standingSource && <span />}
-                <button
-                  type="button"
-                  onClick={() => handleDeleteAssignment(a.assignmentId)}
-                  style={smallDangerBtn}
-                >
-                  이 배정 전체 삭제
-                </button>
               </div>
               {a.instruction && (
                 <div

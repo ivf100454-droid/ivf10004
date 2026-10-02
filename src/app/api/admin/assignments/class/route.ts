@@ -3,6 +3,20 @@ import { prisma } from "@/lib/db";
 import { getAdminFromRequest } from "@/lib/adminAuth";
 import { getActiveRecurring, startOrReplaceRecurring, endRecurring } from "@/lib/recurringAssignments";
 import { ensureTodayAssignmentsForClass } from "@/lib/checklistGeneration";
+import { getAcademyToday } from "@/lib/timezone";
+
+/** 이 반의 반복배정으로 만들어진 "오늘" 반 체크리스트를 학생 전원에게서 삭제한다 (제출 기록 포함). */
+async function deleteTodayClassAssignments(classId: string): Promise<number> {
+  const todayDate = new Date(`${getAcademyToday()}T00:00:00.000Z`);
+  const result = await prisma.checklistAssignment.deleteMany({
+    where: {
+      checklistDate: todayDate,
+      standingSource: "class",
+      recurringAssignment: { targetType: "class", classId },
+    },
+  });
+  return result.count;
+}
 
 /**
  * 클래스 전체에 템플릿을 "반 기본 반복배정"으로 시작한다.
@@ -12,7 +26,8 @@ import { ensureTodayAssignmentsForClass } from "@/lib/checklistGeneration";
  *   갖고 있어도 반 배정은 별개로 그대로 받는다 (반+개별 동시 존재, 서로 덮어쓰지 않음).
  * - 이미 오늘자 "반" 체크리스트를 받은 학생은 건드리지 않는다 (진행 중인 기록 보존) —
  *   아직 오늘자 반 배정이 없는 학생에게만 즉시 생성한다.
- * - templateId가 빈 문자열("")이면 반 기본 반복배정을 종료한다.
+ * - templateId가 빈 문자열("")이면 반 기본 반복배정을 종료하고, 오늘 이미 만들어진 반 체크리스트도 삭제한다.
+ * - 활동 목록이 바뀌면 오늘의 반 체크리스트를 새 목록으로 교체한다 (오늘 기록은 초기화).
  */
 export async function POST(req: NextRequest) {
   const admin = await getAdminFromRequest(req);
@@ -31,7 +46,10 @@ export async function POST(req: NextRequest) {
   if (clearing) {
     const existing = await getActiveRecurring("class", cls.classId);
     if (existing) await endRecurring(existing.recurringAssignmentId);
+    // 해제하면 내일부터는 물론, 오늘 이미 만들어진 반 체크리스트도 함께 삭제한다.
+    const deletedTodayCount = await deleteTodayClassAssignments(cls.classId);
     return NextResponse.json({
+      deletedTodayCount,
       classId: cls.classId,
       className: cls.name,
       templateId: null,
@@ -43,6 +61,13 @@ export async function POST(req: NextRequest) {
 
   const template = await prisma.checklistTemplate.findUnique({ where: { templateId: body.templateId } });
   if (!template) return NextResponse.json({ error: "존재하지 않는 템플릿입니다." }, { status: 404 });
+
+  // 활동 목록이 바뀌면, 오늘 이미 만들어진 예전 반 체크리스트를 먼저 지우고 새 목록으로 교체한다
+  // (지우지 않으면 예전 것과 새 것이 둘 다 보이는 중복이 생긴다).
+  const existingRa = await getActiveRecurring("class", cls.classId);
+  if (existingRa && existingRa.templateId !== template.templateId) {
+    await deleteTodayClassAssignments(cls.classId);
+  }
 
   await startOrReplaceRecurring({
     targetType: "class",
