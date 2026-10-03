@@ -72,7 +72,7 @@ const SUBMIT_FEATURES: { key: keyof Draft; label: string }[] = [
   { key: "hasCheck", label: "☑ 체크완료 박스" },
   { key: "hasCount", label: "🔁 횟수" },
   { key: "hasScore", label: "🏆 시험 점수" },
-  { key: "hasPhotoSubmission", label: "📷 사진 제출" },
+  { key: "hasPhotoSubmission", label: "📷 사진제출 및 QR읽기" },
   { key: "hasVideoSubmission", label: "🎬 영상 제출" },
   { key: "hasAudioSubmission", label: "🎤 음성 제출" },
   { key: "hasFileSubmission", label: "📄 파일 제출" },
