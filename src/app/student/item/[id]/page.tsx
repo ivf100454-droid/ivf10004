@@ -275,9 +275,14 @@ function SubmissionBlock(props: {
   );
 }
 
+function isLink(text: string) {
+  return /^https?:\/\//i.test(text.trim());
+}
+
 function QrScanBlock(props: { assignedItemId: string; scannedUrl: string | null; onDone: () => void }) {
   const [scanning, setScanning] = useState(false);
   const [error, setError] = useState("");
+  const [justScanned, setJustScanned] = useState<string | null>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -349,7 +354,9 @@ function QrScanBlock(props: { assignedItemId: string; scannedUrl: string | null;
       body: JSON.stringify({ url: text }),
     });
     if (res.ok) {
-      if (/^https?:\/\//i.test(text)) {
+      setJustScanned(text);
+      if (isLink(text)) {
+        // 휴대폰 브라우저는 자동으로 연 새 창을 막는 경우가 많아, 막히면 아래 "링크 열기" 버튼으로 연다.
         window.open(text, "_blank", "noreferrer");
       }
       props.onDone();
@@ -399,14 +406,43 @@ function QrScanBlock(props: { assignedItemId: string; scannedUrl: string | null;
 
       {props.scannedUrl && !scanning && (
         <div style={{ marginBottom: 14 }}>
-          <a
-            href={props.scannedUrl}
-            target="_blank"
-            rel="noreferrer"
-            style={{ fontSize: 13, color: colors.blue, display: "block", marginBottom: 10, wordBreak: "break-all" }}
-          >
-            🔗 스캔한 링크 다시 열기
-          </a>
+          {isLink(props.scannedUrl) ? (
+            <a
+              href={props.scannedUrl}
+              target="_blank"
+              rel="noreferrer"
+              style={{
+                display: "block",
+                textAlign: "center",
+                padding: 13,
+                fontSize: 15,
+                fontWeight: 700,
+                color: "#fff",
+                background: colors.blueGradient,
+                borderRadius: 12,
+                textDecoration: "none",
+                marginBottom: 8,
+              }}
+            >
+              🔗 {justScanned ? "링크 열기" : "스캔한 링크 다시 열기"}
+            </a>
+          ) : (
+            <div
+              style={{
+                fontSize: 14,
+                color: colors.navy,
+                background: colors.bg,
+                borderRadius: 12,
+                padding: 12,
+                marginBottom: 8,
+                whiteSpace: "pre-wrap",
+                wordBreak: "break-all",
+              }}
+            >
+              <div style={{ fontSize: 11, color: colors.textMuted, marginBottom: 4 }}>📄 QR에 담긴 내용</div>
+              {props.scannedUrl}
+            </div>
+          )}
           <button
             onClick={handleRescan}
             style={{ fontSize: 12, color: colors.pink, background: "none", border: "none" }}

@@ -23,6 +23,7 @@ async function serializeActivity(a: {
   hasAudioSubmission: boolean;
   hasVideoSubmission: boolean;
   hasFileSubmission: boolean;
+  hasQrScan: boolean;
   materialLinkUrl: string | null;
   materialVideo: { videoId: string; title: string } | null;
   materialPhotoFile: { storageKey: string; originalFilename: string } | null;
@@ -40,6 +41,7 @@ async function serializeActivity(a: {
     hasAudioSubmission: a.hasAudioSubmission,
     hasVideoSubmission: a.hasVideoSubmission,
     hasFileSubmission: a.hasFileSubmission,
+    hasQrScan: a.hasQrScan,
     materialLinkUrl: a.materialLinkUrl,
     materialVideo: a.materialVideo ? { videoId: a.materialVideo.videoId, title: a.materialVideo.title } : null,
     materialPhotoUrl: a.materialPhotoFile ? await getSignedDownloadUrl(a.materialPhotoFile.storageKey, 600) : null,
@@ -88,6 +90,7 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
   const hasAudioSubmission = toBool(formData.get("hasAudioSubmission"));
   const hasVideoSubmission = toBool(formData.get("hasVideoSubmission"));
   const hasFileSubmission = toBool(formData.get("hasFileSubmission"));
+  const hasQrScan = toBool(formData.get("hasQrScan"));
 
   if (hasCount && (!targetCount || targetCount < 1)) {
     return NextResponse.json({ error: "목표 횟수를 입력하세요." }, { status: 400 });
@@ -176,6 +179,7 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
         hasAudioSubmission: hasAudioSubmission,
         hasVideoSubmission: hasVideoSubmission,
         hasFileSubmission: hasFileSubmission,
+        hasQrScan: hasQrScan,
         materialLinkUrl: materialLinkUrl,
         materialVideoId: materialVideoId,
         materialPhotoFileId: materialPhotoFileId,
