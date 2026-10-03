@@ -76,7 +76,6 @@ const SUBMIT_FEATURES: { key: keyof Draft; label: string }[] = [
   { key: "hasVideoSubmission", label: "🎬 영상 제출" },
   { key: "hasAudioSubmission", label: "🎤 음성 제출" },
   { key: "hasFileSubmission", label: "📄 파일 제출" },
-  { key: "hasQrScan", label: "📱 QR 스캔" },
 ];
 
 const card: React.CSSProperties = {
@@ -428,7 +427,6 @@ export default function ActivitiesPage() {
             a.hasVideoSubmission && "🎬",
             a.hasAudioSubmission && "🎤",
             a.hasFileSubmission && "📄",
-            a.hasQrScan && "📱",
             a.materialLinkUrl && "🔗",
             a.materialVideo && "📺",
             a.materialPhotoUrl && "🖼️",
