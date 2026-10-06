@@ -34,6 +34,21 @@ export async function getSignedDownloadUrl(key: string, expiresInSeconds: number
 }
 
 /**
+ * 다운로드용 서명 링크. 이 링크를 열면 브라우저가 재생하지 않고 filename으로 바로 저장한다.
+ */
+export async function getSignedAttachmentUrl(key: string, expiresInSeconds: number, filename: string) {
+  const ttl = expiresInSeconds || 300;
+  const safe = filename.replace(/[\\/:*?"<>|\r\n]+/g, "_");
+  const ascii = safe.replace(/[^\x20-\x7E]/g, "_");
+  const command = new GetObjectCommand({
+    Bucket: R2_BUCKET_NAME,
+    Key: key,
+    ResponseContentDisposition: `attachment; filename="${ascii}"; filename*=UTF-8''${encodeURIComponent(safe)}`,
+  });
+  return getSignedUrl(r2, command, { expiresIn: ttl });
+}
+
+/**
  * R2에서 파일을 영구 삭제한다 (30일 보존기간 정리용). 이미 없는 키를 지우려는 경우도
  * "목표 상태(파일이 없음)"에 이미 도달한 것으로 보고 성공 처리한다.
  */
