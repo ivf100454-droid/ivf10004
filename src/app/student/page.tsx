@@ -88,6 +88,15 @@ export default function StudentPage() {
     }
   }
 
+  async function handleLogout() {
+    if (!confirm("로그아웃할까요?")) return;
+    await fetch("/api/auth/logout", { method: "POST" });
+    setData(null);
+    setLoginId("");
+    setPassword("");
+    setLoggedIn(false);
+  }
+
   if (checking) {
     return (
       <div style={{ fontFamily, minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", color: colors.textSecondary }}>
@@ -216,7 +225,25 @@ export default function StudentPage() {
             <div style={{ fontSize: 15, fontWeight: 800, color: colors.navy }}>BOSTON</div>
             <div style={{ fontSize: 15, fontWeight: 800, color: colors.blue, marginTop: -4 }}>ENGLISH</div>
           </div>
-          <span style={{ fontSize: 20 }}>🔔</span>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <span style={{ fontSize: 20 }}>🔔</span>
+            <button
+              onClick={handleLogout}
+              style={{
+                fontFamily,
+                fontSize: 12,
+                fontWeight: 700,
+                color: colors.textSecondary,
+                background: "#fff",
+                border: "1px solid #e2e8f0",
+                borderRadius: 999,
+                padding: "6px 12px",
+                cursor: "pointer",
+              }}
+            >
+              로그아웃
+            </button>
+          </div>
         </div>
 
         <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 12 }}>
@@ -437,4 +464,3 @@ export default function StudentPage() {
     </div>
   );
 }
-
