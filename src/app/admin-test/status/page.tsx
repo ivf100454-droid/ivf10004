@@ -50,7 +50,35 @@ type DayItem = {
   fileUrl: string | null;
   fileMimeType: string | null;
   fileFilename: string | null;
+  photoDownloadUrl?: string | null;
+  audioDownloadUrl?: string | null;
+  videoDownloadUrl?: string | null;
+  fileDownloadUrl?: string | null;
 };
+
+function DownloadButton(props: { href?: string | null; label: string }) {
+  if (!props.href) return null;
+  return (
+    <a
+      href={props.href}
+      download
+      style={{
+        display: "inline-block",
+        marginTop: 6,
+        padding: "7px 14px",
+        fontSize: 13,
+        fontWeight: 600,
+        color: "#2F6FEB",
+        background: "#EEF4FF",
+        border: "1px solid #2F6FEB",
+        borderRadius: 999,
+        textDecoration: "none",
+      }}
+    >
+      ⬇️ {props.label} 다운로드
+    </a>
+  );
+}
 type DayAssignment = {
   assignmentId: string;
   reopenedForEditing: boolean;
@@ -606,6 +634,9 @@ export default function StatusPage() {
                         ) : (
                           <img src={item.photoUrl} alt="제출 사진" style={{ maxWidth: "100%", borderRadius: 8 }} />
                         )}
+                        <div>
+                          <DownloadButton href={item.photoDownloadUrl} label={item.photoMimeType === "application/pdf" ? "PDF" : "사진"} />
+                        </div>
                       </div>
                     )}
                     {item.hasPhotoSubmission && !item.photoUrl && (
@@ -615,6 +646,9 @@ export default function StatusPage() {
                     {item.hasAudioSubmission && item.audioUrl && (
                       <div style={{ marginTop: 6 }}>
                         <audio controls src={item.audioUrl} style={{ width: "100%" }} />
+                        <div>
+                          <DownloadButton href={item.audioDownloadUrl} label="음성" />
+                        </div>
                       </div>
                     )}
                     {item.hasAudioSubmission && !item.audioUrl && (
@@ -624,6 +658,9 @@ export default function StatusPage() {
                     {item.hasVideoSubmission && item.videoUrl && (
                       <div style={{ marginTop: 6 }}>
                         <video controls src={item.videoUrl} style={{ width: "100%", maxHeight: 400, borderRadius: 8 }} />
+                        <div>
+                          <DownloadButton href={item.videoDownloadUrl} label="영상" />
+                        </div>
                       </div>
                     )}
                     {item.hasVideoSubmission && !item.videoUrl && (
@@ -633,8 +670,11 @@ export default function StatusPage() {
                     {item.hasFileSubmission && item.fileUrl && (
                       <div style={{ marginTop: 6 }}>
                         <a href={item.fileUrl} target="_blank" rel="noreferrer">
-                          📎 {item.fileFilename || "제출 파일 열기/다운로드"}
+                          📎 {item.fileFilename || "제출 파일 열기"}
                         </a>
+                        <div>
+                          <DownloadButton href={item.fileDownloadUrl} label="파일" />
+                        </div>
                       </div>
                     )}
                     {item.hasFileSubmission && !item.fileUrl && (
