@@ -79,6 +79,80 @@ function DownloadButton(props: { href?: string | null; label: string }) {
     </a>
   );
 }
+/** "2026-10-06" → "10월 6일" */
+function fmtMD(dateStr: string) {
+  const [, m, d] = dateStr.split("-");
+  return `${Number(m)}월 ${Number(d)}일`;
+}
+
+function kstTodayStr() {
+  return new Date(Date.now() + 9 * 60 * 60 * 1000).toISOString().slice(0, 10);
+}
+
+async function copyText(text: string) {
+  try {
+    await navigator.clipboard.writeText(text);
+    return true;
+  } catch {
+    // 오래된 브라우저 대비
+    const ta = document.createElement("textarea");
+    ta.value = text;
+    ta.style.position = "fixed";
+    ta.style.opacity = "0";
+    document.body.appendChild(ta);
+    ta.select();
+    const ok = document.execCommand("copy");
+    document.body.removeChild(ta);
+    return ok;
+  }
+}
+
+/** 학부모 안내문 + 링크를 한 번에 복사하는 버튼 */
+function CopyWithMessageButton(props: { text: string }) {
+  const [copied, setCopied] = useState(false);
+  return (
+    <div style={{ marginTop: 8 }}>
+      <button
+        onClick={async () => {
+          if (await copyText(props.text)) {
+            setCopied(true);
+            window.setTimeout(() => setCopied(false), 2500);
+          }
+        }}
+        style={{
+          width: "100%",
+          padding: 12,
+          fontSize: 15,
+          fontWeight: 700,
+          color: "#fff",
+          background: copied ? "#22b573" : "#2F6FEB",
+          border: "none",
+          borderRadius: 10,
+          cursor: "pointer",
+        }}
+      >
+        {copied ? "복사됐어요 ✓ 카톡에 붙여넣기 하세요" : "💬 안내문 포함 복사"}
+      </button>
+      <pre
+        style={{
+          whiteSpace: "pre-wrap",
+          wordBreak: "break-all",
+          fontFamily: "inherit",
+          fontSize: 12,
+          color: "#555",
+          background: "#f7f7f7",
+          border: "1px solid #eee",
+          borderRadius: 8,
+          padding: 10,
+          marginTop: 8,
+        }}
+      >
+        {props.text}
+      </pre>
+    </div>
+  );
+}
+
 type DayAssignment = {
   assignmentId: string;
   reopenedForEditing: boolean;
@@ -110,11 +184,13 @@ export default function StatusPage() {
 
   const [shareMsg, setShareMsg] = useState("");
   const [shareUrl, setShareUrl] = useState("");
+  const [shareText, setShareText] = useState("");
 
   const [dayData, setDayData] = useState<DayData | null>(null);
   const [dayDateStr, setDayDateStr] = useState("");
   const [dayShareMsg, setDayShareMsg] = useState("");
   const [dayShareUrl, setDayShareUrl] = useState("");
+  const [dayShareText, setDayShareText] = useState("");
   // 오늘 체크리스트 목록 옆에 제출 현황(횟수·점수·제출됨 표시)을 보여주기 위한 오늘 상세 데이터
   const [todayDetail, setTodayDetail] = useState<DayData | null>(null);
 
@@ -177,6 +253,7 @@ export default function StatusPage() {
     setActiveStudentId(studentId);
     setScreen("detail");
     setShareUrl("");
+    setShareText("");
     setShareMsg("");
     const y = now.getFullYear();
     const m = now.getMonth() + 1;
@@ -203,6 +280,7 @@ export default function StatusPage() {
   async function handleShareLink() {
     setShareMsg("생성 중...");
     setShareUrl("");
+    setShareText("");
     const res = await fetch(`/api/admin/students/${activeStudentId}/share-link`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -210,7 +288,11 @@ export default function StatusPage() {
     });
     const data = await res.json().catch(() => ({}));
     if (res.ok) {
-      setShareUrl(window.location.origin + "/share/" + data.token);
+      const url = window.location.origin + "/share/" + data.token;
+      const name = students.find((s) => s.studentId === activeStudentId)?.name ?? "";
+      const dateStr = today?.date ?? kstTodayStr();
+      setShareUrl(url);
+      setShareText(`[보스턴영어] ${name} 학생의 ${fmtMD(dateStr)} 학습 체크리스트입니다.\n아래 링크를 눌러 확인해 주세요 😊\n${url}`);
       setShareMsg("링크가 생성되었습니다 (30일간 유효).");
     } else {
       setShareMsg("실패: " + data.error);
@@ -220,6 +302,7 @@ export default function StatusPage() {
   async function handleWeeklyShareLink() {
     setShareMsg("생성 중...");
     setShareUrl("");
+    setShareText("");
     // 이번 주 월요일을 시작일로 계산한다 (한국 기준 오늘 요일에서 역산).
     const now = new Date();
     const kstNow = new Date(now.getTime() + 9 * 60 * 60 * 1000);
@@ -235,7 +318,13 @@ export default function StatusPage() {
     });
     const data = await res.json().catch(() => ({}));
     if (res.ok) {
-      setShareUrl(window.location.origin + "/share/" + data.token);
+      const url = window.location.origin + "/share/" + data.token;
+      const name = students.find((s) => s.studentId === activeStudentId)?.name ?? "";
+      const sunday = new Date(monday.getTime() + 6 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+      const md = (x: string) => `${Number(x.slice(5, 7))}/${Number(x.slice(8, 10))}`;
+      const range = `${md(mondayStr)}~${md(sunday)}`;
+      setShareUrl(url);
+      setShareText(`[보스턴영어] ${name} 학생의 이번 주(${range}) 학습 요약입니다.\n아래 링크를 눌러 확인해 주세요 😊\n${url}`);
       setShareMsg("이번 주(월~일) 요약 링크가 생성되었습니다 (30일간 유효).");
     } else {
       setShareMsg("실패: " + data.error);
@@ -256,6 +345,7 @@ export default function StatusPage() {
     setDayData(null);
     setDayShareMsg("");
     setDayShareUrl("");
+    setDayShareText("");
     setScreen("day");
     const res = await fetch(`/api/admin/students/${activeStudentId}/day?date=${dateStr}`);
     if (res.ok) {
@@ -273,6 +363,7 @@ export default function StatusPage() {
   async function handleDayShareLink() {
     setDayShareMsg("생성 중...");
     setDayShareUrl("");
+    setDayShareText("");
     const res = await fetch(`/api/admin/students/${activeStudentId}/share-link`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -280,7 +371,9 @@ export default function StatusPage() {
     });
     const data = await res.json().catch(() => ({}));
     if (res.ok) {
-      setDayShareUrl(window.location.origin + "/share/" + data.token);
+      const url = window.location.origin + "/share/" + data.token;
+      setDayShareUrl(url);
+      setDayShareText(`[보스턴영어] ${dayData?.studentName ?? ""} 학생의 ${fmtMD(dayDateStr)} 학습 체크리스트입니다.\n아래 링크를 눌러 확인해 주세요 😊\n${url}`);
       setDayShareMsg("링크가 생성되었습니다 (30일간 유효). 이 날짜 기록만 보여줘요.");
     } else {
       setDayShareMsg("실패: " + data.error);
@@ -483,6 +576,7 @@ export default function StatusPage() {
             style={{ ...box, fontSize: 13 }}
           />
         )}
+        {shareText && <CopyWithMessageButton text={shareText} />}
       </div>
     );
   }
@@ -692,6 +786,7 @@ export default function StatusPage() {
             {dayShareUrl && (
               <input readOnly value={dayShareUrl} onFocus={(e) => e.target.select()} style={{ ...box, fontSize: 13 }} />
             )}
+            {dayShareText && <CopyWithMessageButton text={dayShareText} />}
           </>
         )}
       </div>
