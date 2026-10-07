@@ -43,6 +43,7 @@ type DayDetailItem = {
   photoUrl: string | null;
   photoMimeType: string | null;
   photoFilename: string | null;
+  photos?: { url: string; mimeType: string; filename: string }[];
   audioUrl: string | null;
   audioFilename: string | null;
   videoUrl: string | null;
@@ -413,17 +414,22 @@ export default function HistoryPage() {
                         </div>
                       )}
 
-                      {item.hasPhotoSubmission && item.photoUrl && (
-                        <div style={{ marginTop: 6 }}>
-                          {item.photoMimeType === "application/pdf" ? (
-                            <a href={item.photoUrl} target="_blank" rel="noreferrer" style={{ fontSize: 13, color: colors.blue }}>
-                              📄 {item.photoFilename || "제출 PDF 보기"}
-                            </a>
-                          ) : (
-                            <img src={item.photoUrl} alt="제출 사진" style={{ maxWidth: "100%", borderRadius: 10 }} />
-                          )}
-                        </div>
-                      )}
+                      {item.hasPhotoSubmission &&
+                        item.photoUrl &&
+                        (item.photos && item.photos.length > 0
+                          ? item.photos
+                          : [{ url: item.photoUrl, mimeType: item.photoMimeType || "", filename: item.photoFilename || "" }]
+                        ).map((p, i) => (
+                          <div key={i} style={{ marginTop: 6 }}>
+                            {p.mimeType === "application/pdf" ? (
+                              <a href={p.url} target="_blank" rel="noreferrer" style={{ fontSize: 13, color: colors.blue }}>
+                                📄 {p.filename || "제출 PDF 보기"}
+                              </a>
+                            ) : (
+                              <img src={p.url} alt={"제출 사진 " + (i + 1)} style={{ maxWidth: "100%", borderRadius: 10 }} />
+                            )}
+                          </div>
+                        ))}
                       {item.hasAudioSubmission && item.audioUrl && (
                         <div style={{ marginTop: 6 }}>
                           <audio controls src={item.audioUrl} style={{ width: "100%" }} />

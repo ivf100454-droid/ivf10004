@@ -161,11 +161,11 @@ export async function DELETE(req: NextRequest, { params }: { params: { id: strin
     return NextResponse.json({ error: "과거 날짜의 항목은 수정할 수 없습니다." }, { status: 403 });
   }
 
-  const submission = await prisma.photoSubmission.findFirst({
+  // 학생은 사진을 최대 3장까지 올릴 수 있으므로, 관리자 삭제(초기화)는 현재 사진을 모두 지운다.
+  const currentCount = await prisma.photoSubmission.count({
     where: { assignedItemId: item.assignedItemId, status: "current" },
-    orderBy: { submittedAt: "desc" },
   });
-  if (!submission) {
+  if (currentCount === 0) {
     return NextResponse.json({ error: "삭제할 파일이 없습니다." }, { status: 404 });
   }
 
@@ -183,8 +183,8 @@ export async function DELETE(req: NextRequest, { params }: { params: { id: strin
   );
 
   await prisma.$transaction(async function (tx) {
-    await tx.photoSubmission.update({
-      where: { submissionId: submission.submissionId },
+    await tx.photoSubmission.updateMany({
+      where: { assignedItemId: item.assignedItemId, status: "current" },
       data: { status: "superseded" },
     });
     await tx.assignedChecklistItem.update({

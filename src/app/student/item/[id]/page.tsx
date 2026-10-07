@@ -275,6 +275,233 @@ function SubmissionBlock(props: {
   );
 }
 
+type SubmittedPhoto = { submissionId: string; url: string; mimeType: string; filename: string };
+
+const MAX_PHOTOS = 3;
+
+// 사진 제출: 1장만 올려도 완료, 최대 3장(PDF 포함)까지 추가로 올릴 수 있다.
+function PhotoSubmissionBlock(props: { assignedItemId: string; onDone: () => void }) {
+  const meta = kindMeta.photo;
+  const [photos, setPhotos] = useState<SubmittedPhoto[]>([]);
+  const [maxPhotos, setMaxPhotos] = useState(MAX_PHOTOS);
+  const [files, setFiles] = useState<File[]>([]);
+  const [previews, setPreviews] = useState<string[]>([]);
+  const [uploading, setUploading] = useState(false);
+  const [msg, setMsg] = useState("");
+
+  const remaining = Math.max(0, maxPhotos - photos.length);
+
+  useEffect(() => {
+    loadPhotos();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [props.assignedItemId]);
+
+  async function loadPhotos() {
+    const res = await fetch(`/api/student/assigned-items/${props.assignedItemId}/photo`);
+    if (res.ok) {
+      const data = await res.json();
+      setPhotos(Array.isArray(data.photos) ? data.photos : []);
+      if (typeof data.maxPhotos === "number") setMaxPhotos(data.maxPhotos);
+    }
+  }
+
+  function handlePick(e: React.ChangeEvent<HTMLInputElement>) {
+    const picked = e.target.files ? Array.from(e.target.files) : [];
+    e.target.value = "";
+    if (picked.length === 0) return;
+    let chosen = picked;
+    if (picked.length > remaining) {
+      chosen = picked.slice(0, remaining);
+      setMsg(`사진은 최대 ${maxPhotos}장까지예요. 앞의 ${remaining}장만 선택했어요.`);
+    } else {
+      setMsg("");
+    }
+    setFiles(chosen);
+    setPreviews(chosen.map((f) => (f.type.startsWith("image/") ? URL.createObjectURL(f) : "")));
+  }
+
+  async function handleSubmit() {
+    if (files.length === 0) return;
+    setUploading(true);
+    setMsg("");
+    let okCount = 0;
+    let lastError = "";
+    for (const f of files) {
+      const formData = new FormData();
+      formData.append("file", f);
+      const res = await fetch(`/api/student/assigned-items/${props.assignedItemId}/photo`, {
+        method: "POST",
+        body: formData,
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok) okCount += 1;
+      else lastError = data.error || "업로드 실패";
+    }
+    setFiles([]);
+    setPreviews([]);
+    if (lastError) setMsg(okCount > 0 ? `${okCount}장 제출 완료, 일부 실패: ${lastError}` : "실패: " + lastError);
+    else setMsg(`${okCount}장 제출 완료!`);
+    await loadPhotos();
+    props.onDone();
+    setUploading(false);
+  }
+
+  async function handleDelete(submissionId: string) {
+    if (!confirm("이 사진을 삭제하시겠어요?")) return;
+    setUploading(true);
+    const res = await fetch(
+      `/api/student/assigned-items/${props.assignedItemId}/photo?submissionId=${encodeURIComponent(submissionId)}`,
+      { method: "DELETE" }
+    );
+    if (res.ok) {
+      setMsg("삭제되었어요.");
+      await loadPhotos();
+      props.onDone();
+    } else {
+      const data = await res.json().catch(() => ({}));
+      setMsg("삭제 실패: " + (data.error || ""));
+    }
+    setUploading(false);
+  }
+
+  const submitted = photos.length > 0;
+
+  return (
+    <div style={{ background: colors.card, borderRadius: 20, padding: 20, marginBottom: 14, boxShadow: "0 2px 10px rgba(21,42,84,0.05)" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 16 }}>
+        <div
+          style={{
+            width: 44,
+            height: 44,
+            borderRadius: 12,
+            background: colors.blueLight,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            fontSize: 22,
+          }}
+        >
+          {meta.icon}
+        </div>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontSize: 16, fontWeight: 800, color: colors.navy }}>{meta.title}</div>
+          <div style={{ fontSize: 12, color: colors.textMuted, marginTop: 2 }}>1장만 올려도 완료돼요 · 최대 {maxPhotos}장</div>
+        </div>
+        <span
+          style={{
+            fontSize: 12,
+            fontWeight: 700,
+            color: submitted ? colors.green : colors.textMuted,
+            background: submitted ? colors.greenLight : colors.bg,
+            borderRadius: 999,
+            padding: "5px 12px",
+            whiteSpace: "nowrap",
+          }}
+        >
+          {submitted ? `제출됨 ${photos.length}/${maxPhotos}장` : "미제출"}
+        </span>
+      </div>
+
+      <div style={{ background: colors.blueLight, borderRadius: 14, padding: 14, marginBottom: 14, fontSize: 13, color: colors.navy }}>
+        <b>💡 사진 TIP</b>
+        <ul style={{ margin: "6px 0 0", paddingLeft: 18 }}>
+          {meta.tips.map((t) => (
+            <li key={t} style={{ marginBottom: 2 }}>
+              {t}
+            </li>
+          ))}
+        </ul>
+      </div>
+
+      {photos.length > 0 && (
+        <div style={{ display: "flex", flexDirection: "column", gap: 12, marginBottom: 14 }}>
+          {photos.map((p, i) => (
+            <div key={p.submissionId} style={{ border: `1px solid ${colors.border}`, borderRadius: 14, padding: 10 }}>
+              <div style={{ fontSize: 12, fontWeight: 700, color: colors.textSecondary, marginBottom: 6 }}>사진 {i + 1}</div>
+              {p.mimeType === "application/pdf" ? (
+                <a href={p.url} target="_blank" rel="noreferrer" style={{ fontSize: 13, color: colors.blue }}>
+                  📄 {p.filename || "제출 PDF 열어보기"}
+                </a>
+              ) : (
+                <img src={p.url} alt={`제출 사진 ${i + 1}`} style={{ maxWidth: "100%", borderRadius: 10 }} />
+              )}
+              <button
+                onClick={() => handleDelete(p.submissionId)}
+                disabled={uploading}
+                style={{ display: "block", marginTop: 6, fontSize: 12, color: colors.pink, background: "none", border: "none", padding: 0 }}
+              >
+                이 사진 삭제
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {remaining > 0 && (
+        <>
+          <label
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: 6,
+              padding: "24px 12px",
+              border: `2px dashed ${colors.border}`,
+              borderRadius: 14,
+              marginBottom: 12,
+              cursor: "pointer",
+              color: colors.textSecondary,
+              fontSize: 13,
+            }}
+          >
+            <span style={{ fontSize: 26 }}>{meta.heroIcon}</span>
+            {files.length > 0 ? (
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 8, justifyContent: "center", marginTop: 6 }}>
+                {files.map((f, i) =>
+                  previews[i] ? (
+                    <img key={i} src={previews[i]} alt="미리보기" style={{ width: 90, height: 90, objectFit: "cover", borderRadius: 10 }} />
+                  ) : (
+                    <span key={i} style={{ fontSize: 12 }}>📄 {f.name}</span>
+                  )
+                )}
+              </div>
+            ) : (
+              <span>
+                {photos.length === 0 ? "눌러서 사진을 선택하세요" : "눌러서 사진을 더 추가하세요"} (앞으로 {remaining}장 더 가능)
+              </span>
+            )}
+            <input type="file" accept={meta.accept} multiple onChange={handlePick} style={{ display: "none" }} />
+          </label>
+
+          <button
+            onClick={handleSubmit}
+            disabled={uploading || files.length === 0}
+            style={{
+              width: "100%",
+              padding: 14,
+              fontSize: 15,
+              fontWeight: 700,
+              color: "#fff",
+              background: files.length === 0 ? colors.textMuted : colors.blueGradient,
+              border: "none",
+              borderRadius: 12,
+            }}
+          >
+            {uploading ? "제출 중..." : files.length > 0 ? `사진 ${files.length}장 제출하기` : photos.length === 0 ? meta.actionLabel : "사진 추가 제출하기"}
+          </button>
+        </>
+      )}
+      {remaining === 0 && (
+        <p style={{ fontSize: 12, color: colors.textSecondary, margin: 0 }}>최대 {maxPhotos}장을 모두 올렸어요. 바꾸려면 사진을 삭제한 뒤 다시 올려주세요.</p>
+      )}
+
+      {msg && <p style={{ fontSize: 12, color: colors.textSecondary, marginTop: 8 }}>{msg}</p>}
+      <p style={{ fontSize: 11, color: colors.textMuted, marginTop: 10 }}>🔒 제출한 내용은 선생님만 확인할 수 있어요.</p>
+    </div>
+  );
+}
+
 function isLink(text: string) {
   return /^https?:\/\//i.test(text.trim());
 }
@@ -685,7 +912,7 @@ export default function ItemDetailPage() {
         )}
 
         {item.hasPhotoSubmission && (
-          <SubmissionBlock assignedItemId={item.assignedItemId} kind="photo" submitted={item.completed || false} onDone={load} />
+          <PhotoSubmissionBlock assignedItemId={item.assignedItemId} onDone={load} />
         )}
         {item.hasAudioSubmission && (
           <SubmissionBlock assignedItemId={item.assignedItemId} kind="audio" submitted={item.completed || false} onDone={load} />

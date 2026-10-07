@@ -23,6 +23,7 @@ type SharedItem = {
   photoUrl: string | null;
   photoMimeType: string | null;
   photoFilename: string | null;
+  photos?: { url: string; mimeType: string; filename: string }[];
   audioUrl: string | null;
   audioFilename: string | null;
   videoUrl: string | null;
@@ -90,19 +91,24 @@ function ItemCard({ item }: { item: SharedItem }) {
         </a>
       )}
 
-      {item.hasPhotoSubmission && item.photoUrl && (
-        <div style={{ marginTop: 6 }}>
-          {item.photoMimeType === "application/pdf" ? (
-            <iframe
-              src={item.photoUrl}
-              title={item.photoFilename || "제출 PDF"}
-              style={{ width: "100%", height: 400, border: "1px solid #ddd", borderRadius: 8 }}
-            />
-          ) : (
-            <img src={item.photoUrl} alt="제출 사진" style={{ maxWidth: "100%", borderRadius: 8 }} />
-          )}
-        </div>
-      )}
+      {item.hasPhotoSubmission &&
+        item.photoUrl &&
+        (item.photos && item.photos.length > 0
+          ? item.photos
+          : [{ url: item.photoUrl, mimeType: item.photoMimeType || "", filename: item.photoFilename || "" }]
+        ).map((p, i) => (
+          <div key={i} style={{ marginTop: 6 }}>
+            {p.mimeType === "application/pdf" ? (
+              <iframe
+                src={p.url}
+                title={p.filename || "제출 PDF"}
+                style={{ width: "100%", height: 400, border: "1px solid #ddd", borderRadius: 8 }}
+              />
+            ) : (
+              <img src={p.url} alt={"제출 사진 " + (i + 1)} style={{ maxWidth: "100%", borderRadius: 8 }} />
+            )}
+          </div>
+        ))}
       {item.hasPhotoSubmission && !item.photoUrl && (
         <div style={{ fontSize: 13, color: "#aaa", marginTop: 4 }}>아직 제출된 파일이 없습니다.</div>
       )}

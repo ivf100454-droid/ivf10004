@@ -43,6 +43,7 @@ type DayItem = {
   photoUrl: string | null;
   photoMimeType: string | null;
   photoFilename: string | null;
+  photos?: { url: string; downloadUrl?: string | null; mimeType: string; filename: string }[];
   audioUrl: string | null;
   audioFilename: string | null;
   videoUrl: string | null;
@@ -462,7 +463,7 @@ export default function StatusPage() {
                 const badges: string[] = [];
                 if (d.hasCount) badges.push(`${d.currentCount ?? 0}/${d.targetCount ?? 0}회`);
                 if (d.hasScore && d.score != null) badges.push(`${d.score}점`);
-                if (d.photoUrl) badges.push("📷 제출됨");
+                if (d.photoUrl) badges.push(d.photos && d.photos.length > 1 ? `📷 ${d.photos.length}장 제출됨` : "📷 제출됨");
                 if (d.audioUrl) badges.push("🎤 제출됨");
                 if (d.videoUrl) badges.push("🎬 제출됨");
                 if (d.fileUrl) badges.push("📎 제출됨");
@@ -717,22 +718,35 @@ export default function StatusPage() {
                       </a>
                     )}
 
-                    {item.hasPhotoSubmission && item.photoUrl && (
-                      <div style={{ marginTop: 6 }}>
-                        {item.photoMimeType === "application/pdf" ? (
-                          <iframe
-                            src={item.photoUrl}
-                            title={item.photoFilename || "제출 PDF"}
-                            style={{ width: "100%", height: 400, border: "1px solid #ddd", borderRadius: 8 }}
-                          />
-                        ) : (
-                          <img src={item.photoUrl} alt="제출 사진" style={{ maxWidth: "100%", borderRadius: 8 }} />
-                        )}
-                        <div>
-                          <DownloadButton href={item.photoDownloadUrl} label={item.photoMimeType === "application/pdf" ? "PDF" : "사진"} />
+                    {item.hasPhotoSubmission &&
+                      item.photoUrl &&
+                      (item.photos && item.photos.length > 0
+                        ? item.photos
+                        : [
+                            {
+                              url: item.photoUrl,
+                              downloadUrl: item.photoDownloadUrl,
+                              mimeType: item.photoMimeType || "",
+                              filename: item.photoFilename || "",
+                            },
+                          ]
+                      ).map((p, i, arr) => (
+                        <div key={i} style={{ marginTop: 6 }}>
+                          {arr.length > 1 && <div style={{ fontSize: 12, color: "#888", marginBottom: 4 }}>사진 {i + 1}</div>}
+                          {p.mimeType === "application/pdf" ? (
+                            <iframe
+                              src={p.url}
+                              title={p.filename || "제출 PDF"}
+                              style={{ width: "100%", height: 400, border: "1px solid #ddd", borderRadius: 8 }}
+                            />
+                          ) : (
+                            <img src={p.url} alt={"제출 사진 " + (i + 1)} style={{ maxWidth: "100%", borderRadius: 8 }} />
+                          )}
+                          <div>
+                            <DownloadButton href={p.downloadUrl} label={p.mimeType === "application/pdf" ? "PDF" : "사진"} />
+                          </div>
                         </div>
-                      </div>
-                    )}
+                      ))}
                     {item.hasPhotoSubmission && !item.photoUrl && (
                       <div style={{ fontSize: 13, color: "#aaa", marginTop: 4 }}>아직 제출된 사진이 없습니다.</div>
                     )}

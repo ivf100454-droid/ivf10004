@@ -28,6 +28,13 @@ async function mapSharedItem(item: any) {
     photoUrl: photo ? await getSignedDownloadUrl(photo.file.storageKey, 600) : null,
     photoMimeType: photo ? photo.file.mimeType : null,
     photoFilename: photo ? photo.file.originalFilename : null,
+    photos: await Promise.all(
+      item.photoSubmissions.map(async (p: any) => ({
+        url: await getSignedDownloadUrl(p.file.storageKey, 600),
+        mimeType: p.file.mimeType,
+        filename: p.file.originalFilename,
+      }))
+    ),
     audioUrl: audio ? await getSignedDownloadUrl(audio.file.storageKey, 600) : null,
     audioFilename: audio ? audio.file.originalFilename : null,
     videoUrl: video ? await getSignedDownloadUrl(video.file.storageKey, 600) : null,
@@ -69,7 +76,7 @@ export async function GET(req: NextRequest, { params }: { params: { token: strin
       items: {
         orderBy: { sortOrder: "asc" },
         include: {
-          photoSubmissions: { where: { status: "current" }, include: { file: true } },
+          photoSubmissions: { where: { status: "current" }, include: { file: true }, orderBy: { submittedAt: "asc" } },
           audioSubmissions: { where: { status: "current" }, include: { file: true } },
           videoSubmissions: { where: { status: "current" }, include: { file: true } },
           fileSubmissions: { where: { status: "current" }, include: { file: true } },

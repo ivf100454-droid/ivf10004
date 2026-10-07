@@ -10,6 +10,8 @@ const MAX_PDF_SIZE = 15 * 1024 * 1024;
 const ALLOWED_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp", "image/heic"];
 const ALLOWED_PDF_TYPES = ["application/pdf"];
 const ALLOWED_TYPES = ALLOWED_IMAGE_TYPES.concat(ALLOWED_PDF_TYPES);
+// 한 항목당 학생이 올릴 수 있는 사진(PDF 포함) 최대 개수 — 1장만 올려도 완료 처리됨
+const MAX_PHOTOS_PER_ITEM = 3;
 
 function evaluateCompleted(
   required: string[],
@@ -77,6 +79,16 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     return NextResponse.json({ error: "파일이 너무 큽니다 (최대 " + limitLabel + ")." }, { status: 400 });
   }
 
+  const existingCount = await prisma.photoSubmission.count({
+    where: { assignedItemId: item.assignedItemId, status: "current" },
+  });
+  if (existingCount >= MAX_PHOTOS_PER_ITEM) {
+    return NextResponse.json(
+      { error: "사진은 최대 " + MAX_PHOTOS_PER_ITEM + "장까지 올릴 수 있어요." },
+      { status: 400 }
+    );
+  }
+
   const arrayBuffer = await file.arrayBuffer();
   const buffer = Buffer.from(arrayBuffer);
   const fileId = randomUUID();
@@ -109,11 +121,6 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       },
     });
 
-    await tx.photoSubmission.updateMany({
-      where: { assignedItemId: item.assignedItemId, status: "current" },
-      data: { status: "superseded" },
-    });
-
     const submission = await tx.photoSubmission.create({
       data: {
         assignedItemId: item.assignedItemId,
@@ -127,7 +134,8 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       where: { assignedItemId: item.assignedItemId },
       data: {
         completed: completed,
-        completedAt: completed ? new Date() : null,
+        // 이미 완료된 항목에 사진을 추가로 올려도 처음 완료된 시각은 그대로 둔다.
+        completedAt: completed ? item.completedAt || new Date() : null,
       },
     });
 
@@ -144,22 +152,25 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
   const check = await getOwnedItem(student.studentId, params.id);
   if ("error" in check) return NextResponse.json({ error: check.error }, { status: check.status });
 
-  const submission = await prisma.photoSubmission.findFirst({
+  const submissions = await prisma.photoSubmission.findMany({
     where: { assignedItemId: params.id, status: "current" },
     include: { file: true },
-    orderBy: { submittedAt: "desc" },
+    orderBy: { submittedAt: "asc" },
   });
-  if (!submission) {
-    return NextResponse.json({ error: "제출된 사진이 없습니다." }, { status: 404 });
-  }
 
-  const url = await getSignedDownloadUrl(submission.file.storageKey, 300);
-  return NextResponse.json({
-    url: url,
-    submittedAt: submission.submittedAt,
-    mimeType: submission.file.mimeType,
-    filename: submission.file.originalFilename,
-  });
+  const photos = await Promise.all(
+    submissions.map(async function (s) {
+      return {
+        submissionId: s.submissionId,
+        url: await getSignedDownloadUrl(s.file.storageKey, 300),
+        submittedAt: s.submittedAt,
+        mimeType: s.file.mimeType,
+        filename: s.file.originalFilename,
+      };
+    })
+  );
+
+  return NextResponse.json({ photos: photos, maxPhotos: MAX_PHOTOS_PER_ITEM });
 }
 
 export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
@@ -174,13 +185,26 @@ export async function DELETE(req: NextRequest, { params }: { params: { id: strin
     return NextResponse.json({ error: "과거 날짜의 항목은 수정할 수 없습니다." }, { status: 403 });
   }
 
+  // ?submissionId= 로 지울 사진 한 장을 지정한다. 지정이 없으면 가장 최근 사진을 지운다.
+  const submissionId = req.nextUrl.searchParams.get("submissionId");
   const submission = await prisma.photoSubmission.findFirst({
-    where: { assignedItemId: item.assignedItemId, status: "current" },
+    where: submissionId
+      ? { submissionId: submissionId, assignedItemId: item.assignedItemId, status: "current" }
+      : { assignedItemId: item.assignedItemId, status: "current" },
     orderBy: { submittedAt: "desc" },
   });
   if (!submission) {
     return NextResponse.json({ error: "삭제할 파일이 없습니다." }, { status: 404 });
   }
+
+  // 지우고 나서도 사진이 1장 이상 남아 있으면 사진 제출 조건은 계속 충족된 것으로 본다.
+  const remainingCount = await prisma.photoSubmission.count({
+    where: {
+      assignedItemId: item.assignedItemId,
+      status: "current",
+      NOT: { submissionId: submission.submissionId },
+    },
+  });
 
   const required: string[] = Array.isArray(item.requiredFeatures)
     ? (item.requiredFeatures as string[])
@@ -191,7 +215,7 @@ export async function DELETE(req: NextRequest, { params }: { params: { id: strin
     item.currentCount,
     item.targetCount,
     item.score,
-    false,
+    remainingCount > 0,
     !!item.qrScannedAt
   );
 

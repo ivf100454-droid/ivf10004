@@ -55,7 +55,7 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
       items: {
         orderBy: { sortOrder: "asc" },
         include: {
-          photoSubmissions: { where: { status: "current" }, include: { file: true } },
+          photoSubmissions: { where: { status: "current" }, include: { file: true }, orderBy: { submittedAt: "asc" } },
           audioSubmissions: { where: { status: "current" }, include: { file: true } },
           videoSubmissions: { where: { status: "current" }, include: { file: true } },
           fileSubmissions: { where: { status: "current" }, include: { file: true } },
@@ -120,6 +120,14 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
             photoDownloadUrl: photo ? await downloadUrl(photo.file, item.title, "사진") : null,
             photoMimeType: photo ? photo.file.mimeType : null,
             photoFilename: photo ? photo.file.originalFilename : null,
+            photos: await Promise.all(
+              item.photoSubmissions.map(async (p, i) => ({
+                url: await getSignedDownloadUrl(p.file.storageKey, 600),
+                downloadUrl: await downloadUrl(p.file, item.title, item.photoSubmissions.length > 1 ? "사진" + (i + 1) : "사진"),
+                mimeType: p.file.mimeType,
+                filename: p.file.originalFilename,
+              }))
+            ),
             audioUrl: audio ? await getSignedDownloadUrl(audio.file.storageKey, 600) : null,
             audioDownloadUrl: audio ? await downloadUrl(audio.file, item.title, "음성") : null,
             audioFilename: audio ? audio.file.originalFilename : null,
