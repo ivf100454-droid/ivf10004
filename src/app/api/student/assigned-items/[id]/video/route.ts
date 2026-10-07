@@ -5,7 +5,7 @@ import { getStudentFromRequest } from "@/lib/studentAuth";
 import { isAssignmentEditable } from "@/lib/timezone";
 import { uploadToR2, getSignedDownloadUrl } from "@/lib/storage";
 
-const MAX_VIDEO_SIZE = 50 * 1024 * 1024;
+const MAX_VIDEO_SIZE = 200 * 1024 * 1024;
 const ALLOWED_TYPES = ["video/mp4", "video/quicktime", "video/webm", "video/3gpp", "video/x-m4v"];
 
 function evaluateCompleted(
@@ -68,7 +68,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     return NextResponse.json({ error: "지원하지 않는 영상 파일 형식입니다." }, { status: 400 });
   }
   if (file.size > MAX_VIDEO_SIZE) {
-    return NextResponse.json({ error: "파일이 너무 큽니다 (최대 50MB)." }, { status: 400 });
+    return NextResponse.json({ error: "파일이 너무 큽니다 (최대 200MB)." }, { status: 400 });
   }
 
   const arrayBuffer = await file.arrayBuffer();
