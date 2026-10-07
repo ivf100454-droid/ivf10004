@@ -744,6 +744,31 @@ export default function ItemDetailPage() {
     await load();
   }
 
+  // 들어오기 전 화면(홈/체크리스트/지난기록)으로 돌아간다. 이전 화면이 없으면(링크로 바로 들어온 경우) 체크리스트로 간다.
+  function goBack() {
+    if (typeof window !== "undefined" && window.history.length > 1) {
+      router.back();
+    } else {
+      router.replace("/student/checklist");
+    }
+  }
+
+  // 맨 아래 완료 버튼: 체크 항목이면 체크까지 한 뒤 이전 화면으로 돌아간다.
+  // 제출 항목은 완료 여부가 제출로 정해지므로 돌아가기만 한다.
+  const [finishing, setFinishing] = useState(false);
+  async function handleFinish() {
+    if (!item) return;
+    setFinishing(true);
+    if (item.hasCheck && !item.checked) {
+      await fetch("/api/student/assigned-items/" + item.assignedItemId, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ checked: true }),
+      }).catch(() => {});
+    }
+    goBack();
+  }
+
   if (!data) {
     return (
       <div style={{ fontFamily, minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", color: colors.textSecondary }}>
@@ -770,7 +795,7 @@ export default function ItemDetailPage() {
     <div style={{ fontFamily, minHeight: "100vh", background: colors.bg, paddingBottom: 40 }}>
       <div style={{ maxWidth: 480, margin: "0 auto", padding: "20px 16px" }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
-          <button onClick={() => router.back()} style={{ fontSize: 20, color: colors.navy, background: "none", border: "none" }}>
+          <button onClick={goBack} style={{ fontSize: 20, color: colors.navy, background: "none", border: "none" }}>
             ‹
           </button>
           <div style={{ fontSize: 17, fontWeight: 800, color: colors.navy }}>학습 상세</div>
@@ -927,32 +952,23 @@ export default function ItemDetailPage() {
           <QrScanBlock assignedItemId={item.assignedItemId} scannedUrl={item.qrScannedUrl} onDone={load} />
         )}
 
-        {(item.hasCheck || item.hasCount || item.hasScore) &&
-          !item.hasPhotoSubmission &&
-          !item.hasAudioSubmission &&
-          !item.hasVideoSubmission &&
-          !item.hasFileSubmission &&
-          !item.hasQrScan && (
-            <button
-              onClick={() => {
-                if (item.hasCheck) patchItem({ checked: true });
-                router.push("/student/checklist");
-              }}
-              style={{
-                width: "100%",
-                padding: 15,
-                fontSize: 16,
-                fontWeight: 700,
-                color: "#fff",
-                background: colors.green,
-                border: "none",
-                borderRadius: 14,
-                marginTop: 4,
-              }}
-            >
-              ✓ 학습 완료 체크
-            </button>
-          )}
+        <button
+          onClick={handleFinish}
+          disabled={finishing}
+          style={{
+            width: "100%",
+            padding: 15,
+            fontSize: 16,
+            fontWeight: 700,
+            color: "#fff",
+            background: colors.green,
+            border: "none",
+            borderRadius: 14,
+            marginTop: 4,
+          }}
+        >
+          {finishing ? "저장 중..." : item.hasCheck && !item.checked ? "✓ 학습 완료 체크" : "✓ 완료"}
+        </button>
       </div>
     </div>
   );
