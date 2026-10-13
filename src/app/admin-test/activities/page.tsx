@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { colors, fontFamily } from "../theme";
 
 type TeachingVideo = { videoId: string; title: string };
@@ -126,6 +126,67 @@ export default function ActivitiesPage() {
   const [draft, setDraft] = useState<Draft>(emptyDraft());
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState("");
+
+  // 드래그로 순서 바꾸기 (폰 터치·PC 마우스 공용: Pointer Events 사용)
+  const [dragId, setDragId] = useState<string | null>(null);
+  const [orderMsg, setOrderMsg] = useState("");
+  const rowRefs = useRef<Map<string, HTMLDivElement>>(new Map());
+  const activitiesRef = useRef<Activity[]>([]);
+  activitiesRef.current = activities;
+  const orderBeforeDrag = useRef<string>("");
+
+  function onHandleDown(e: React.PointerEvent<HTMLSpanElement>, id: string) {
+    e.preventDefault();
+    e.stopPropagation();
+    e.currentTarget.setPointerCapture(e.pointerId);
+    orderBeforeDrag.current = activitiesRef.current.map((a) => a.activityId).join(",");
+    setDragId(id);
+  }
+
+  function onHandleMove(e: React.PointerEvent<HTMLSpanElement>) {
+    if (!dragId) return;
+    const y = e.clientY;
+    // 화면 위/아래 가장자리 근처에서는 자동 스크롤
+    if (y < 70) window.scrollBy(0, -12);
+    else if (y > window.innerHeight - 70) window.scrollBy(0, 12);
+
+    const list = activitiesRef.current;
+    const moved = list.find((x) => x.activityId === dragId);
+    if (!moved) return;
+    // 끌고 있는 항목을 뺀 나머지 중, 손가락보다 아래에 중심이 있는 첫 항목 앞에 끼워 넣는다
+    const others = list.filter((x) => x.activityId !== dragId);
+    let to = others.findIndex((x) => {
+      const el = rowRefs.current.get(x.activityId);
+      if (!el) return false;
+      const r = el.getBoundingClientRect();
+      return y < r.top + r.height / 2;
+    });
+    if (to < 0) to = others.length;
+    const next = others.slice();
+    next.splice(to, 0, moved);
+    if (next.every((x, i) => x.activityId === list[i].activityId)) return;
+    setActivities(next);
+  }
+
+  async function onHandleUp() {
+    if (!dragId) return;
+    setDragId(null);
+    const ids = activitiesRef.current.map((a) => a.activityId);
+    if (ids.join(",") === orderBeforeDrag.current) return;
+    setOrderMsg("순서 저장 중...");
+    const res = await fetch("/api/admin/activities/reorder", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ activityIds: ids }),
+    });
+    if (res.ok) {
+      setOrderMsg("순서가 저장되었어요");
+      setTimeout(() => setOrderMsg(""), 1500);
+    } else {
+      setOrderMsg("순서 저장에 실패했어요. 다시 시도해주세요.");
+      refresh();
+    }
+  }
 
   async function refresh() {
     const res = await fetch("/api/admin/activities");
@@ -417,6 +478,11 @@ export default function ActivitiesPage() {
     <div style={{ maxWidth: 560, margin: "24px auto", padding: 16, fontFamily }}>
       <h1 style={{ fontSize: 20, fontWeight: 800, marginBottom: 16, color: colors.navy }}>활동 만들기</h1>
       {activities.length === 0 && <p style={{ color: colors.textSecondary }}>아직 생성된 활동이 없습니다.</p>}
+      {activities.length > 1 && (
+        <p style={{ fontSize: 12, color: orderMsg ? colors.navy : colors.textMuted, marginBottom: 8 }}>
+          {orderMsg || "왼쪽 ⠿ 를 잡고 끌어서 순서를 바꿀 수 있어요"}
+        </p>
+      )}
       <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 16 }}>
         {activities.map((a) => {
           const tags = [
@@ -434,15 +500,55 @@ export default function ActivitiesPage() {
           ]
             .filter(Boolean)
             .join(" ");
+          const isDragging = dragId === a.activityId;
           return (
-            <button
+            <div
               key={a.activityId}
-              onClick={() => startEdit(a)}
-              style={{ textAlign: "left", ...card, padding: "12px 14px", display: "flex", justifyContent: "space-between", alignItems: "center", cursor: "pointer" }}
+              ref={(el) => {
+                if (el) rowRefs.current.set(a.activityId, el);
+                else rowRefs.current.delete(a.activityId);
+              }}
+              style={{
+                ...card,
+                border: `1.5px solid ${colors.border}`,
+                display: "flex",
+                alignItems: "stretch",
+                padding: 0,
+                opacity: isDragging ? 0.85 : 1,
+                boxShadow: isDragging ? "0 6px 18px rgba(0,0,0,0.18)" : card.boxShadow,
+                transform: isDragging ? "scale(1.02)" : undefined,
+                transition: "transform 0.1s",
+                position: "relative",
+                zIndex: isDragging ? 2 : 1,
+              }}
             >
-              <span style={{ fontSize: 14, fontWeight: 700, color: colors.navy }}>{a.name}</span>
-              <span style={{ fontSize: 13 }}>{tags}</span>
-            </button>
+              <span
+                onPointerDown={(e) => onHandleDown(e, a.activityId)}
+                onPointerMove={onHandleMove}
+                onPointerUp={onHandleUp}
+                onPointerCancel={onHandleUp}
+                title="끌어서 순서 바꾸기"
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  padding: "0 10px 0 14px",
+                  fontSize: 18,
+                  color: colors.textMuted,
+                  cursor: isDragging ? "grabbing" : "grab",
+                  touchAction: "none",
+                  userSelect: "none",
+                }}
+              >
+                ⠿
+              </span>
+              <button
+                onClick={() => startEdit(a)}
+                style={{ flex: 1, textAlign: "left", background: "none", border: "none", padding: "12px 14px 12px 0", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, cursor: "pointer", fontFamily }}
+              >
+                <span style={{ fontSize: 14, fontWeight: 700, color: colors.navy }}>{a.name}</span>
+                <span style={{ fontSize: 13, whiteSpace: "nowrap" }}>{tags}</span>
+              </button>
+            </div>
           );
         })}
       </div>

@@ -58,7 +58,7 @@ export async function GET(req: NextRequest) {
 
     const activities = await prisma.activity.findMany({
       include: { materialVideo: true, materialPhotoFile: true, materialDocFile: true },
-      orderBy: { createdAt: "desc" },
+      orderBy: [{ sortOrder: "asc" }, { createdAt: "desc" }],
     });
 
     const out = await Promise.all(activities.map(serializeActivity));
@@ -169,8 +169,13 @@ export async function POST(req: NextRequest) {
       materialDocFileId = meta.fileId;
     }
 
+    // 새 활동은 목록 맨 위에 오도록 현재 가장 작은 순서값보다 1 작게 넣는다.
+    const top = await tx.activity.aggregate({ _min: { sortOrder: true } });
+    const sortOrder = (top._min.sortOrder ?? 0) - 1;
+
     const activity = await tx.activity.create({
       data: {
+        sortOrder: sortOrder,
         name: name,
         hasCheck: hasCheck,
         hasCount: hasCount,

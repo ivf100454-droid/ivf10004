@@ -166,6 +166,8 @@ model Activity {
   activityId String   @id @default(uuid()) @map("activity_id")
   name       String
   createdAt  DateTime @default(now()) @map("created_at")
+  // 활동 만들기 목록의 드래그 순서(작을수록 위). 기존 활동은 0이며 같은 값끼리는 최근순.
+  sortOrder  Int      @default(0) @map("sort_order")
 
   hasCheck           Boolean @default(false) @map("has_check")
   hasCount           Boolean @default(false) @map("has_count")
