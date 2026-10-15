@@ -14,6 +14,7 @@ function toBool(v: FormDataEntryValue | null) {
 async function serializeActivity(a: {
   activityId: string;
   name: string;
+  areaId: string | null;
   hasCheck: boolean;
   hasCount: boolean;
   targetCount: number | null;
@@ -32,6 +33,7 @@ async function serializeActivity(a: {
   return {
     activityId: a.activityId,
     name: a.name,
+    areaId: a.areaId,
     hasCheck: a.hasCheck,
     hasCount: a.hasCount,
     targetCount: a.targetCount,
@@ -81,6 +83,14 @@ export async function POST(req: NextRequest) {
 
   const name = String(formData.get("name") || "").trim();
   if (!name) return NextResponse.json({ error: "활동명을 입력하세요." }, { status: 400 });
+
+  const areaIdRaw = String(formData.get("areaId") || "").trim();
+  let areaId: string | null = null;
+  if (areaIdRaw) {
+    const area = await prisma.activityArea.findUnique({ where: { areaId: areaIdRaw } });
+    if (!area) return NextResponse.json({ error: "존재하지 않는 활동 영역입니다." }, { status: 400 });
+    areaId = areaIdRaw;
+  }
 
   const hasCheck = toBool(formData.get("hasCheck"));
   const hasCount = toBool(formData.get("hasCount"));
@@ -177,6 +187,7 @@ export async function POST(req: NextRequest) {
       data: {
         sortOrder: sortOrder,
         name: name,
+        areaId: areaId,
         hasCheck: hasCheck,
         hasCount: hasCount,
         targetCount: targetCount,

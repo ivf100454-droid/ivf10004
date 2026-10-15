@@ -162,12 +162,26 @@ model TeachingVideo {
 /// 관리자가 활동을 한 번 만들어두면 여러 템플릿에서 재사용할 수 있다.
 /// "학생이 해야 할 것"(제출 기능)과 "관리자가 학생에게 보여줄 자료"(참고자료)를
 /// 하나의 활동 안에 함께 정의한다.
+// 활동 영역(범주) — 예: "Easy Link 4" 안에 세부활동 "L04문장 읽기", "L04단어클래스 카드"
+model ActivityArea {
+  areaId     String     @id @default(uuid()) @map("area_id")
+  name       String
+  sortOrder  Int        @default(0) @map("sort_order")
+  createdAt  DateTime   @default(now()) @map("created_at")
+  activities Activity[]
+
+  @@map("activity_areas")
+}
+
 model Activity {
   activityId String   @id @default(uuid()) @map("activity_id")
   name       String
   createdAt  DateTime @default(now()) @map("created_at")
   // 활동 만들기 목록의 드래그 순서(작을수록 위). 기존 활동은 0이며 같은 값끼리는 최근순.
   sortOrder  Int      @default(0) @map("sort_order")
+  // 활동 영역(범주). 비어 있으면 "미분류". 영역을 삭제해도 활동은 지워지지 않고 미분류로 돌아간다.
+  areaId     String?       @map("area_id")
+  area       ActivityArea? @relation(fields: [areaId], references: [areaId], onDelete: SetNull)
 
   hasCheck           Boolean @default(false) @map("has_check")
   hasCount           Boolean @default(false) @map("has_count")

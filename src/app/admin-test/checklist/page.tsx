@@ -64,9 +64,11 @@ type Assignment = {
   instruction: string | null;
 };
 type TodayData = { assignments: Assignment[]; progress: number };
+type AreaRow = { areaId: string; name: string };
 type ActivityRow = {
   activityId: string;
   name: string;
+  areaId: string | null;
   hasCheck: boolean;
   hasCount: boolean;
   hasScore: boolean;
@@ -99,10 +101,26 @@ function sameList(a: string[], b: string[]) {
 /** "활동 배정" 버튼 — 누르면 활동 만들기에서 만들어둔 활동 목록이 펼쳐지고, 체크해서 고른다. */
 function ActivityPicker(props: {
   activities: ActivityRow[];
+  areas: AreaRow[];
   picked: string[];
   onChange: (ids: string[]) => void;
 }) {
   const [open, setOpen] = useState(false);
+  // 펼쳐진 활동 영역들 ("" = 미분류)
+  const [openAreas, setOpenAreas] = useState<string[]>([]);
+  function toggleArea(id: string) {
+    setOpenAreas((cur) => (cur.includes(id) ? cur.filter((x) => x !== id) : [...cur, id]));
+  }
+  const groups: { id: string; name: string; items: ActivityRow[] }[] = [
+    ...props.areas.map((ar) => ({
+      id: ar.areaId,
+      name: "📁 " + ar.name,
+      items: props.activities.filter((a) => a.areaId === ar.areaId),
+    })),
+    { id: "", name: "🗂️ 미분류", items: props.activities.filter((a) => !a.areaId || !props.areas.some((ar) => ar.areaId === a.areaId)) },
+  ].filter((g) => g.items.length > 0);
+  // 영역을 하나도 안 만들었으면 예전처럼 활동을 바로 보여준다
+  const flat = props.areas.length === 0;
   function toggle(id: string) {
     if (props.picked.includes(id)) props.onChange(props.picked.filter((x) => x !== id));
     else props.onChange([...props.picked, id]);
@@ -156,9 +174,10 @@ function ActivityPicker(props: {
               에서 먼저 만들어주세요.
             </p>
           ) : (
-            props.activities.map((a) => {
-              const idx = props.picked.indexOf(a.activityId);
-              return (
+            (() => {
+              const renderRow = (a: ActivityRow) => {
+                const idx = props.picked.indexOf(a.activityId);
+                return (
                 <label
                   key={a.activityId}
                   style={{
@@ -182,7 +201,42 @@ function ActivityPicker(props: {
                   {idx >= 0 && <span style={{ fontSize: 11, color: colors.blue, fontWeight: 700 }}>{idx + 1}번</span>}
                 </label>
               );
-            })
+              };
+              if (flat) return props.activities.map(renderRow);
+              return groups.map((g) => {
+                const isOpen = openAreas.includes(g.id);
+                const pickedHere = g.items.filter((a) => props.picked.includes(a.activityId)).length;
+                return (
+                  <div key={g.id || "__none"}>
+                    <button
+                      type="button"
+                      onClick={() => toggleArea(g.id)}
+                      style={{
+                        width: "100%",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 8,
+                        padding: "12px",
+                        border: "none",
+                        borderBottom: `1px solid ${colors.border}`,
+                        background: colors.card,
+                        cursor: "pointer",
+                        fontFamily,
+                        textAlign: "left",
+                      }}
+                    >
+                      <span style={{ flex: 1, fontSize: 14, fontWeight: 800, color: colors.navy }}>{g.name}</span>
+                      <span style={{ fontSize: 12, color: pickedHere ? colors.blue : colors.textSecondary, fontWeight: pickedHere ? 700 : 400 }}>
+                        {pickedHere ? `${pickedHere}개 선택 · ` : ""}
+                        {g.items.length}개
+                      </span>
+                      <span style={{ fontSize: 12, color: colors.textSecondary }}>{isOpen ? "▲" : "▼"}</span>
+                    </button>
+                    {isOpen && <div style={{ paddingLeft: 12 }}>{g.items.map(renderRow)}</div>}
+                  </div>
+                );
+              });
+            })()
           )}
         </div>
       )}
@@ -601,6 +655,7 @@ export default function ChecklistTestPage() {
   const [templates, setTemplates] = useState<Template[]>([]);
   const [classes, setClasses] = useState<ClassRow[]>([]);
   const [activities, setActivities] = useState<ActivityRow[]>([]);
+  const [areas, setAreas] = useState<AreaRow[]>([]);
   const [studentActivityIds, setStudentActivityIds] = useState<string[]>([]);
   const [classActivityIds, setClassActivityIds] = useState<string[]>([]);
 
@@ -636,6 +691,8 @@ export default function ChecklistTestPage() {
     setClasses(await cRes.json());
     const aRes = await fetch("/api/admin/activities");
     if (aRes.ok) setActivities(await aRes.json());
+    const arRes = await fetch("/api/admin/activity-areas");
+    if (arRes.ok) setAreas(await arRes.json());
   }
 
   /** 배정(템플릿 묶음)에 들어있는 활동 ID 목록 — 삭제된 활동은 빠진다. */
@@ -996,7 +1053,7 @@ export default function ChecklistTestPage() {
               </option>
             ))}
           </select>
-          <ActivityPicker activities={activities} picked={studentActivityIds} onChange={setStudentActivityIds} />
+          <ActivityPicker activities={activities} areas={areas} picked={studentActivityIds} onChange={setStudentActivityIds} />
           <button type="submit" style={primaryBtn}>
             이 학생에게 개별 배정
           </button>
@@ -1058,7 +1115,7 @@ export default function ChecklistTestPage() {
               </option>
             ))}
           </select>
-          <ActivityPicker activities={activities} picked={classActivityIds} onChange={setClassActivityIds} />
+          <ActivityPicker activities={activities} areas={areas} picked={classActivityIds} onChange={setClassActivityIds} />
           <button type="submit" style={primaryBtn}>
             이 클래스 전체에 배정
           </button>

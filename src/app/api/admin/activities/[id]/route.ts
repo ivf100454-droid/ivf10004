@@ -14,6 +14,7 @@ function toBool(v: FormDataEntryValue | null) {
 async function serializeActivity(a: {
   activityId: string;
   name: string;
+  areaId: string | null;
   hasCheck: boolean;
   hasCount: boolean;
   targetCount: number | null;
@@ -32,6 +33,7 @@ async function serializeActivity(a: {
   return {
     activityId: a.activityId,
     name: a.name,
+    areaId: a.areaId,
     hasCheck: a.hasCheck,
     hasCount: a.hasCount,
     targetCount: a.targetCount,
@@ -78,6 +80,17 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
 
   const name = String(formData.get("name") || "").trim();
   if (!name) return NextResponse.json({ error: "활동명을 입력하세요." }, { status: 400 });
+
+  // areaId 칸이 보내졌을 때만 영역을 바꾼다 (빈 값 = 미분류). 안 보내면 기존 영역 유지.
+  let areaUpdate: { areaId?: string | null } = {};
+  if (formData.has("areaId")) {
+    const areaIdRaw = String(formData.get("areaId") || "").trim();
+    if (areaIdRaw) {
+      const area = await prisma.activityArea.findUnique({ where: { areaId: areaIdRaw } });
+      if (!area) return NextResponse.json({ error: "존재하지 않는 활동 영역입니다." }, { status: 400 });
+    }
+    areaUpdate = { areaId: areaIdRaw || null };
+  }
 
   const hasCheck = toBool(formData.get("hasCheck"));
   const hasCount = toBool(formData.get("hasCount"));
@@ -170,6 +183,7 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
       where: { activityId: params.id },
       data: {
         name: name,
+        ...areaUpdate,
         hasCheck: hasCheck,
         hasCount: hasCount,
         targetCount: targetCount,
