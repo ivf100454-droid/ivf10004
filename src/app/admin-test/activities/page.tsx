@@ -245,6 +245,118 @@ function DragRow(props: {
   );
 }
 
+function normalizeLink(url: string): string {
+  const u = url.trim();
+  if (/^[a-z][a-z0-9+.-]*:\/\//i.test(u)) return u;
+  return "https://" + u;
+}
+
+// 서명된 주소는 10분 뒤 만료되므로, 누르는 순간 새 주소를 받아서 연다.
+// 팝업 차단을 피하려고 빈 탭을 먼저 열고 주소를 나중에 넣는다.
+async function openFresh(getUrl: () => Promise<string | null>) {
+  const win = window.open("", "_blank");
+  try {
+    const url = await getUrl();
+    if (!url) throw new Error("no url");
+    if (win) win.location.href = url;
+    else window.location.href = url;
+  } catch {
+    if (win) win.close();
+    alert("자료를 열 수 없어요. 잠시 후 다시 시도해 주세요.");
+  }
+}
+
+async function freshActivity(activityId: string): Promise<Activity | null> {
+  const res = await fetch("/api/admin/activities/" + activityId);
+  if (!res.ok) return null;
+  return res.json();
+}
+
+function MaterialLinks(props: { a: Activity }) {
+  const a = props.a;
+  const iconStyle: React.CSSProperties = {
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    minWidth: 30,
+    height: 30,
+    borderRadius: 8,
+    background: "#EAF2FF",
+    border: "none",
+    textDecoration: "none",
+    fontSize: 14,
+    cursor: "pointer",
+    padding: 0,
+  };
+  const stop = (e: React.SyntheticEvent) => e.stopPropagation();
+  return (
+    <>
+      {a.materialLinkUrl && (
+        <a
+          href={normalizeLink(a.materialLinkUrl)}
+          target="_blank"
+          rel="noopener noreferrer"
+          title={"참고링크 열기: " + a.materialLinkUrl}
+          onClick={stop}
+          onKeyDown={stop}
+          style={iconStyle}
+        >
+          🔗
+        </a>
+      )}
+      {a.materialVideo && (
+        <button
+          type="button"
+          title={"학습영상 열기: " + a.materialVideo.title}
+          onClick={(e) => {
+            stop(e);
+            const vid = a.materialVideo!.videoId;
+            openFresh(async () => {
+              const res = await fetch("/api/admin/teaching-videos");
+              if (!res.ok) return null;
+              const list: { videoId: string; url: string }[] = await res.json();
+              const v = list.find((x) => x.videoId === vid);
+              return v ? v.url : null;
+            });
+          }}
+          onKeyDown={stop}
+          style={iconStyle}
+        >
+          📺
+        </button>
+      )}
+      {a.materialPhotoUrl && (
+        <button
+          type="button"
+          title={"참고사진 열기" + (a.materialPhotoFilename ? ": " + a.materialPhotoFilename : "")}
+          onClick={(e) => {
+            stop(e);
+            openFresh(async () => (await freshActivity(a.activityId))?.materialPhotoUrl ?? null);
+          }}
+          onKeyDown={stop}
+          style={iconStyle}
+        >
+          🖼️
+        </button>
+      )}
+      {a.materialDocUrl && (
+        <button
+          type="button"
+          title={"참고파일 열기" + (a.materialDocFilename ? ": " + a.materialDocFilename : "")}
+          onClick={(e) => {
+            stop(e);
+            openFresh(async () => (await freshActivity(a.activityId))?.materialDocUrl ?? null);
+          }}
+          onKeyDown={stop}
+          style={iconStyle}
+        >
+          📎
+        </button>
+      )}
+    </>
+  );
+}
+
 const rowBtn: React.CSSProperties = {
   flex: 1,
   textAlign: "left",
@@ -813,19 +925,26 @@ export default function ActivitiesPage() {
             a.hasVideoSubmission && "🎬",
             a.hasAudioSubmission && "🎤",
             a.hasFileSubmission && "📄",
-            a.materialLinkUrl && "🔗",
-            a.materialVideo && "📺",
-            a.materialPhotoUrl && "🖼️",
-            a.materialDocUrl && "📎",
           ]
             .filter(Boolean)
             .join(" ");
           return (
             <DragRow key={a.activityId} id={a.activityId} drag={activityDrag} draggable={visible.length > 1}>
-              <button onClick={() => startEdit(a)} style={rowBtn}>
+              <div
+                role="button"
+                tabIndex={0}
+                onClick={() => startEdit(a)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") startEdit(a);
+                }}
+                style={rowBtn}
+              >
                 <span style={{ fontSize: 14, fontWeight: 700, color: colors.navy }}>{a.name}</span>
-                <span style={{ fontSize: 13, whiteSpace: "nowrap" }}>{tags}</span>
-              </button>
+                <span style={{ fontSize: 13, whiteSpace: "nowrap", display: "flex", alignItems: "center", gap: 2 }}>
+                  {tags && <span style={{ marginRight: 2 }}>{tags}</span>}
+                  <MaterialLinks a={a} />
+                </span>
+              </div>
             </DragRow>
           );
         })}
