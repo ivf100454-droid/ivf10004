@@ -280,6 +280,7 @@ export default function ActivitiesPage() {
   const [showNewArea, setShowNewArea] = useState(false);
   const [newAreaName, setNewAreaName] = useState("");
   const [areaMsg, setAreaMsg] = useState("");
+  const [notice, setNotice] = useState(""); // 다른 영역으로 옮긴 뒤 띄우는 안내
 
   const activitiesRef = useRef<Activity[]>([]);
   activitiesRef.current = activities;
@@ -372,6 +373,7 @@ export default function ActivitiesPage() {
   }
 
   function openArea(areaId: string) {
+    setNotice("");
     setCurrentAreaId(areaId);
     setView("area");
     window.scrollTo(0, 0);
@@ -417,12 +419,14 @@ export default function ActivitiesPage() {
   }
 
   function startAdd() {
+    setNotice("");
     setDraft(emptyDraft(currentAreaId));
     setMode("add");
     setMsg("");
   }
 
   function startEdit(a: Activity) {
+    setNotice("");
     setEditingId(a.activityId);
     setDraft({
       name: a.name,
@@ -503,8 +507,14 @@ export default function ActivitiesPage() {
     const data = await res.json().catch(() => ({}));
     if (res.ok) {
       await refresh();
-      // 저장한 활동이 들어간 영역 화면으로 돌아간다
-      setCurrentAreaId(draft.areaId);
+      // 수정/추가 전에 보고 있던 영역 목록으로 그대로 돌아간다
+      if (draft.areaId !== currentAreaId) {
+        const target = areas.find((ar) => ar.areaId === draft.areaId);
+        const targetName = target ? target.name : "미분류";
+        setNotice(`✅ "${draft.name.trim()}" 활동을 "${targetName}" 영역으로 ${mode === "edit" ? "옮겼어요" : "추가했어요"}`);
+      } else {
+        setNotice("");
+      }
       setView("area");
       setMode("list");
     } else {
@@ -756,9 +766,14 @@ export default function ActivitiesPage() {
   const visible = activities.filter((a) => inArea(a, currentAreaId));
   return (
     <div style={{ maxWidth: 560, margin: "24px auto", padding: 16, fontFamily }}>
-      <button onClick={() => setView("areas")} style={{ ...secondaryBtn, padding: "8px 14px", marginBottom: 12 }}>
+      <button onClick={() => { setNotice(""); setView("areas"); }} style={{ ...secondaryBtn, padding: "8px 14px", marginBottom: 12 }}>
         ← 활동 영역 목록
       </button>
+      {notice && (
+        <div style={{ background: "#EAF2FF", color: colors.navy, fontSize: 13, fontWeight: 700, padding: "10px 12px", borderRadius: 10, marginBottom: 12 }}>
+          {notice}
+        </div>
+      )}
       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16, flexWrap: "wrap" }}>
         <h1 style={{ fontSize: 20, fontWeight: 800, color: colors.navy, margin: 0, flex: 1 }}>
           {currentArea ? "📁 " + currentArea.name : "🗂️ 미분류"}
