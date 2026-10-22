@@ -1025,7 +1025,25 @@ export default function ChecklistTestPage() {
 
   return (
     <div style={{ maxWidth: 560, margin: "24px auto", padding: 16, fontFamily }}>
-      <h1 style={{ fontSize: 20, fontWeight: 800, marginBottom: 16, color: colors.navy }}>체크리스트 배정 / 오늘 확인</h1>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, marginBottom: 16, flexWrap: "wrap" }}>
+        <h1 style={{ fontSize: 20, fontWeight: 800, margin: 0, color: colors.navy }}>체크리스트 배정 / 오늘 확인</h1>
+        <a
+          href="/admin-test/print-today"
+          style={{
+            background: colors.card,
+            border: `1.5px solid ${colors.blue}`,
+            color: colors.blue,
+            borderRadius: 10,
+            padding: "8px 12px",
+            fontSize: 13,
+            fontWeight: 800,
+            textDecoration: "none",
+            whiteSpace: "nowrap",
+          }}
+        >
+          🖨️ 오늘 수업 체크리스트 프린트
+        </a>
+      </div>
 
       <div style={{ ...card, padding: 18, marginBottom: 20 }}>
         <h2 style={{ fontSize: 15, fontWeight: 800, marginBottom: 4, color: colors.navy }}>1. 학생에게 배정 (개별 추가)</h2>

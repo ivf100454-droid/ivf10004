@@ -20,6 +20,7 @@ export default function AdminNav() {
 
   return (
     <div
+      className="no-print"
       style={{
         fontFamily,
         background: colors.card,
