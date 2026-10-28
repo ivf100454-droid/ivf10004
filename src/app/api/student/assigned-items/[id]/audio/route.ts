@@ -5,18 +5,34 @@ import { getStudentFromRequest } from "@/lib/studentAuth";
 import { isAssignmentEditable } from "@/lib/timezone";
 import { uploadToR2, getSignedDownloadUrl } from "@/lib/storage";
 
-const MAX_AUDIO_SIZE = 20 * 1024 * 1024;
-const ALLOWED_TYPES = [
-  "audio/mpeg",
-  "audio/mp4",
-  "audio/x-m4a",
-  "audio/aac",
-  "audio/wav",
-  "audio/wave",
-  "audio/webm",
-  "audio/ogg",
-  "audio/3gpp",
-];
+const MAX_AUDIO_SIZE = 100 * 1024 * 1024; // 100MB (긴 녹음·고음질 파일 대비)
+// 폰·브라우저가 형식을 비워 보내거나 특이한 이름으로 보낼 때 확장자로 판별한다.
+const AUDIO_EXT_TYPES: Record<string, string> = {
+  mp3: "audio/mpeg",
+  m4a: "audio/mp4",
+  mp4: "audio/mp4",
+  aac: "audio/aac",
+  wav: "audio/wav",
+  webm: "audio/webm",
+  ogg: "audio/ogg",
+  oga: "audio/ogg",
+  opus: "audio/ogg",
+  "3gp": "audio/3gpp",
+  "3gpp": "audio/3gpp",
+  amr: "audio/amr",
+  flac: "audio/flac",
+};
+
+/** 음성 파일이면 저장할 형식(MIME)을, 아니면 null을 돌려준다. */
+function resolveAudioType(file: File): string | null {
+  const type = (file.type || "").split(";")[0].trim().toLowerCase();
+  const ext = (file.name.split(".").pop() || "").toLowerCase();
+  if (type.startsWith("audio/")) return type;
+  if (AUDIO_EXT_TYPES[ext]) return AUDIO_EXT_TYPES[ext];
+  // 일부 폰은 m4a 녹음을 video/mp4, 3gp를 video/3gpp로 보낸다.
+  if (type === "video/mp4" || type === "video/3gpp" || type === "video/webm") return type.replace("video/", "audio/");
+  return null;
+}
 
 function evaluateCompleted(
   required: string[],
@@ -74,11 +90,18 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   if (!file || !(file instanceof File)) {
     return NextResponse.json({ error: "file 필드가 필요합니다." }, { status: 400 });
   }
-  if (ALLOWED_TYPES.indexOf(file.type) === -1) {
-    return NextResponse.json({ error: "지원하지 않는 음성 파일 형식입니다." }, { status: 400 });
+  const sizeMb = (file.size / 1024 / 1024).toFixed(1);
+  // 실패 원인을 나중에 확인할 수 있도록 형식·크기를 서버 기록에 남긴다.
+  console.log(`[student-audio] item=${item.assignedItemId} name="${file.name}" type="${file.type}" size=${sizeMb}MB`);
+  const audioType = resolveAudioType(file);
+  if (!audioType) {
+    return NextResponse.json(
+      { error: `음성 파일이 아니에요 (${file.type || "형식 알 수 없음"}). 🎤 바로 녹음을 이용해주세요.` },
+      { status: 400 }
+    );
   }
   if (file.size > MAX_AUDIO_SIZE) {
-    return NextResponse.json({ error: "파일이 너무 큽니다 (최대 20MB)." }, { status: 400 });
+    return NextResponse.json({ error: `파일이 너무 커요 (${sizeMb}MB, 최대 100MB). 🎤 바로 녹음을 이용해주세요.` }, { status: 400 });
   }
 
   const arrayBuffer = await file.arrayBuffer();
@@ -86,7 +109,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   const fileId = randomUUID();
   const storageKey = "audio/" + item.assignedItemId + "/" + fileId;
 
-  await uploadToR2(storageKey, buffer, file.type);
+  await uploadToR2(storageKey, buffer, audioType);
 
   const required: string[] = Array.isArray(item.requiredFeatures)
     ? (item.requiredFeatures as string[])
@@ -107,7 +130,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
         fileId: fileId,
         storageKey: storageKey,
         originalFilename: file.name || "audio",
-        mimeType: file.type,
+        mimeType: audioType,
         sizeBytes: file.size,
         uploadedBy: student.accountId,
       },

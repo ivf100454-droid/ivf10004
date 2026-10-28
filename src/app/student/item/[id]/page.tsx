@@ -110,16 +110,30 @@ function SubmissionBlock(props: {
 
   async function handleSubmit() {
     if (files.length === 0) return;
-    if (props.kind === "audio" && !confirm("이 녹음을 제출하시겠습니까?")) return;
+    if (props.kind === "audio") {
+      const sizeMb = files[0].size / 1024 / 1024;
+      if (sizeMb > 100) {
+        setMsg(`파일이 너무 커요 (${sizeMb.toFixed(1)}MB, 최대 100MB). 위의 🎤 버튼으로 바로 녹음해주세요.`);
+        return;
+      }
+      if (!confirm("이 녹음을 제출하시겠습니까?")) return;
+    }
     setUploading(true);
-    setMsg("");
+    setMsg("올리는 중이에요… 화면을 닫지 말고 잠깐만 기다려주세요.");
     const formData = new FormData();
     formData.append("file", files[0]);
-    const res = await fetch(`/api/student/assigned-items/${props.assignedItemId}/${props.kind}`, {
-      method: "POST",
-      body: formData,
-    });
-    const data = await res.json().catch(() => ({}));
+    let res: Response;
+    try {
+      res = await fetch(`/api/student/assigned-items/${props.assignedItemId}/${props.kind}`, {
+        method: "POST",
+        body: formData,
+      });
+    } catch {
+      setMsg("인터넷 연결이 끊겨서 제출하지 못했어요. 다시 시도해주세요.");
+      setUploading(false);
+      return;
+    }
+    const data = await res.json().catch(() => ({ error: "서버 응답 오류 (" + res.status + ")" }));
     if (res.ok) {
       setMsg("제출 완료!");
       setFiles([]);
