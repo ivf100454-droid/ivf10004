@@ -4,6 +4,8 @@ import { useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { colors, fontFamily, getItemVisual } from "../../theme";
+import MaterialsView from "../../MaterialsView";
+import type { ItemMaterials } from "../../MaterialsButton";
 
 type TeachingVideo = { title: string; url: string };
 
@@ -29,6 +31,7 @@ type AssignedItem = {
   qrScannedAt: string | null;
   completed: boolean;
   teachingVideo: TeachingVideo | null;
+  materials?: ItemMaterials | null;
 };
 type Assignment = { assignmentId: string; items: AssignedItem[] };
 type TodayData = { assignments: Assignment[] };
@@ -852,6 +855,8 @@ export default function ItemDetailPage() {
           </span>
         </div>
 
+        <MaterialsView materials={item.materials} />
+
         {item.hasCheck && (
           <div style={{ background: colors.card, borderRadius: 20, padding: 20, marginBottom: 14, boxShadow: "0 2px 10px rgba(21,42,84,0.05)" }}>
             <label style={{ display: "flex", alignItems: "center", gap: 12, cursor: "pointer" }}>
@@ -905,34 +910,6 @@ export default function ItemDetailPage() {
                 </option>
               ))}
             </select>
-          </div>
-        )}
-
-        {item.linkUrl && (
-          <a
-            href={item.linkUrl}
-            target="_blank"
-            rel="noreferrer"
-            style={{
-              display: "block",
-              background: colors.blueLight,
-              borderRadius: 16,
-              padding: 16,
-              marginBottom: 14,
-              color: colors.blue,
-              fontWeight: 700,
-              fontSize: 14,
-              textDecoration: "none",
-            }}
-          >
-            🔗 {item.linkLabel || "자료 열기"}
-          </a>
-        )}
-
-        {item.teachingVideo && (
-          <div style={{ background: colors.card, borderRadius: 20, padding: 16, marginBottom: 14, boxShadow: "0 2px 10px rgba(21,42,84,0.05)" }}>
-            <div style={{ fontSize: 13, color: colors.textSecondary, marginBottom: 8 }}>🎓 학습영상: {item.teachingVideo.title}</div>
-            <video controls src={item.teachingVideo.url} style={{ width: "100%", borderRadius: 12, maxHeight: 300 }} />
           </div>
         )}
 

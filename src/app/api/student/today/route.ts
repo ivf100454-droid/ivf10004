@@ -5,6 +5,7 @@ import { getAcademyToday } from "@/lib/timezone";
 import { getSignedDownloadUrl } from "@/lib/storage";
 import { computeStreak } from "@/lib/streak";
 import { ensureTodayAssignment } from "@/lib/checklistGeneration";
+import { resolveActivityMaterials } from "@/lib/activityMaterials";
 
 /**
  * 로그인한 학생 본인의 "오늘" 체크리스트 배정·항목·진행률을 반환한다.
@@ -61,11 +62,35 @@ export async function GET(req: NextRequest) {
     videoMap[v.videoId] = { title: v.title, url: await getSignedDownloadUrl(v.file.storageKey, 600) };
   }
 
+  // 활동에 넣어둔 "현재" 자료(배정 후에 바꾼 것도 반영)
+  const materialsMap = await resolveActivityMaterials(
+    assignments.flatMap((a) =>
+      a.items.map((item) => ({
+        assignedItemId: item.assignedItemId,
+        activityId: item.activityId,
+        title: item.title,
+        sourceTemplateId: a.sourceTemplateId,
+      }))
+    )
+  );
+
   const assignmentsOut = assignments.map((a) => ({
     ...a,
     items: a.items.map((item) => ({
       ...item,
       teachingVideo: item.teachingVideoId ? videoMap[item.teachingVideoId] || null : null,
+      // 활동 연결이 없는 예전 항목은 배정 때 복사된 링크·학습영상으로 대신 보여준다.
+      materials:
+        materialsMap[item.assignedItemId] ||
+        (item.linkUrl || (item.teachingVideoId && videoMap[item.teachingVideoId])
+          ? {
+              activityName: item.title,
+              linkUrl: item.linkUrl,
+              video: item.teachingVideoId ? videoMap[item.teachingVideoId] || null : null,
+              photo: null,
+              doc: null,
+            }
+          : null),
     })),
   }));
 

@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import BottomNav from "../BottomNav";
+import MaterialsButton, { type ItemMaterials } from "../MaterialsButton";
 import { colors, fontFamily, getItemVisual, isSubmissionItem } from "../theme";
 
 type AssignedItem = {
@@ -21,6 +22,7 @@ type AssignedItem = {
   hasVideoSubmission: boolean;
   hasFileSubmission: boolean;
   hasQrScan: boolean;
+  materials?: ItemMaterials | null;
   completed: boolean;
 };
 type Assignment = { assignmentId: string; instruction: string | null; items: AssignedItem[] };
@@ -138,20 +140,24 @@ export default function ChecklistPage() {
         {activeItems.map((item, idx) => {
           const visual = getItemVisual(item);
           return (
-            <Link
+            <div
               key={item.assignedItemId}
+              style={{
+                background: colors.card,
+                borderRadius: 16,
+                marginBottom: 10,
+                boxShadow: "0 2px 10px rgba(21,42,84,0.05)",
+              }}
+            >
+            <Link
               href={`/student/item/${item.assignedItemId}`}
               style={{
                 display: "flex",
                 alignItems: "center",
                 gap: 12,
-                background: colors.card,
-                borderRadius: 16,
                 padding: "14px 16px",
-                marginBottom: 10,
                 textDecoration: "none",
                 color: "inherit",
-                boxShadow: "0 2px 10px rgba(21,42,84,0.05)",
               }}
             >
               <div
@@ -217,6 +223,8 @@ export default function ChecklistPage() {
                 </span>
               )}
             </Link>
+            <MaterialsButton assignedItemId={item.assignedItemId} materials={item.materials} />
+            </div>
           );
         })}
 

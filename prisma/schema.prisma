@@ -203,6 +203,7 @@ model Activity {
   materialDocFile     FileMetadata? @relation("ActivityMaterialDoc", fields: [materialDocFileId], references: [fileId], onDelete: SetNull)
 
   templateItems TemplateItem[]
+  assignedItems AssignedChecklistItem[]
 
   @@map("activities")
 }
@@ -361,6 +362,10 @@ model AssignedChecklistItem {
   sortOrder      Int      @default(0) @map("sort_order")
   isProgressItem Boolean  @default(true) @map("is_progress_item")
   status         AssignmentItemStatus @default(active)
+  // 이 항목을 만든 활동. 학생 화면은 여기서 활동의 "현재" 자료(링크·영상·사진·파일)를 가져온다.
+  // 예전 항목은 비어 있으며, 그때는 원본 템플릿 항목 제목으로 활동을 찾아 연결한다.
+  activityId     String?   @map("activity_id")
+  activity       Activity? @relation(fields: [activityId], references: [activityId], onDelete: SetNull)
 
   hasCheck           Boolean @default(false) @map("has_check")
   hasCount           Boolean @default(false) @map("has_count")

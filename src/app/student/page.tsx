@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import MaterialsButton, { type ItemMaterials } from "./MaterialsButton";
 import BottomNav from "./BottomNav";
 import { colors, fontFamily, getItemVisual } from "./theme";
 
@@ -21,6 +22,7 @@ type AssignedItem = {
   hasVideoSubmission: boolean;
   hasFileSubmission: boolean;
   hasQrScan: boolean;
+  materials?: ItemMaterials | null;
   completed: boolean;
 };
 type Assignment = { assignmentId: string; items: AssignedItem[] };
@@ -378,20 +380,24 @@ export default function StudentPage() {
           const visual = getItemVisual(item);
           const status = statusLabel(item);
           return (
-            <Link
+            <div
               key={item.assignedItemId}
+              style={{
+                background: colors.card,
+                borderRadius: 16,
+                marginBottom: 10,
+                boxShadow: "0 2px 10px rgba(21,42,84,0.05)",
+              }}
+            >
+            <Link
               href={`/student/item/${item.assignedItemId}`}
               style={{
                 display: "flex",
                 alignItems: "center",
                 gap: 12,
-                background: colors.card,
-                borderRadius: 16,
                 padding: "14px 16px",
-                marginBottom: 10,
                 textDecoration: "none",
                 color: "inherit",
-                boxShadow: "0 2px 10px rgba(21,42,84,0.05)",
               }}
             >
               <div
@@ -457,6 +463,8 @@ export default function StudentPage() {
                 </span>
               )}
             </Link>
+            <MaterialsButton assignedItemId={item.assignedItemId} materials={item.materials} />
+            </div>
           );
         })}
       </div>

@@ -89,6 +89,7 @@ async function ensureAssignmentForRecurring(
         items: {
           create: itemsToCreate.map((item) => ({
             title: item.title,
+            activityId: item.activityId,
             sortOrder: item.sortOrder,
             isProgressItem: item.isProgressItem,
             hasCheck: item.hasCheck,
@@ -103,7 +104,7 @@ async function ensureAssignmentForRecurring(
             hasAudioSubmission: item.hasAudioSubmission,
             hasVideoSubmission: item.hasVideoSubmission,
             hasFileSubmission: item.hasFileSubmission,
-                        hasQrScan: item.hasQrScan,
+            hasQrScan: item.hasQrScan,
             requiredFeatures: item.requiredFeatures as any,
           })),
         },
