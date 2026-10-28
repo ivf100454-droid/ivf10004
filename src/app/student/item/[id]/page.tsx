@@ -5,6 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { colors, fontFamily, getItemVisual } from "../../theme";
 import MaterialsView from "../../MaterialsView";
+import AudioRecorder from "../../AudioRecorder";
 import type { ItemMaterials } from "../../MaterialsButton";
 
 type TeachingVideo = { title: string; url: string };
@@ -109,6 +110,7 @@ function SubmissionBlock(props: {
 
   async function handleSubmit() {
     if (files.length === 0) return;
+    if (props.kind === "audio" && !confirm("이 녹음을 제출하시겠습니까?")) return;
     setUploading(true);
     setMsg("");
     const formData = new FormData();
@@ -226,6 +228,16 @@ function SubmissionBlock(props: {
 
       {!viewUrl && (
         <>
+          {props.kind === "audio" && (
+            <AudioRecorder
+              disabled={uploading}
+              onRecorded={(f) => {
+                setFiles(f ? [f] : []);
+                setPreviews([]);
+                setMsg("");
+              }}
+            />
+          )}
           <label
             style={{
               display: "flex",
@@ -233,7 +245,7 @@ function SubmissionBlock(props: {
               alignItems: "center",
               justifyContent: "center",
               gap: 6,
-              padding: "28px 12px",
+              padding: props.kind === "audio" ? "12px" : "28px 12px",
               border: `2px dashed ${colors.border}`,
               borderRadius: 14,
               marginBottom: 12,
@@ -242,8 +254,14 @@ function SubmissionBlock(props: {
               fontSize: 13,
             }}
           >
-            <span style={{ fontSize: 26 }}>{meta.heroIcon}</span>
-            {previews[0] ? (
+            {props.kind !== "audio" && <span style={{ fontSize: 26 }}>{meta.heroIcon}</span>}
+            {props.kind === "audio" ? (
+              <span>
+                {files[0] && !files[0].name.startsWith("recording-")
+                  ? "📁 " + files[0].name
+                  : "또는 휴대폰에 있는 녹음 파일 선택하기"}
+              </span>
+            ) : previews[0] ? (
               <img src={previews[0]} alt="미리보기" style={{ maxWidth: "100%", maxHeight: 140, borderRadius: 10, marginTop: 8 }} />
             ) : files[0] ? (
               <span>{files[0].name}</span>
