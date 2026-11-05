@@ -675,7 +675,13 @@ export default function ChecklistTestPage() {
   const [shareLinkUrl, setShareLinkUrl] = useState("");
   const [shareLinkMsg, setShareLinkMsg] = useState("");
 
-  const activeViewStudentId = viewMode === "student" ? viewStudentId : viewClassStudentId;
+  // 클래스로 보기에서 "반 전체 보기"를 고른 경우
+  const CLASS_ALL = "__all__";
+  const isClassAll = viewMode === "class" && !!viewClassId && viewClassStudentId === CLASS_ALL;
+  const [classTodayList, setClassTodayList] = useState<{ studentId: string; name: string; data: TodayData }[]>([]);
+  const [classShareFor, setClassShareFor] = useState("");
+
+  const activeViewStudentId = viewMode === "student" ? viewStudentId : isClassAll ? "" : viewClassStudentId;
 
   async function refreshBase() {
     const sRes = await fetch("/api/admin/students");
@@ -740,11 +746,36 @@ export default function ChecklistTestPage() {
     }
   }
 
+  /** 반 전체 학생의 오늘 체크리스트를 한 번에 불러온다. */
+  async function loadClassToday(classId: string) {
+    const list = students.filter((s) => s.studentStatus !== "withdrawn" && s.currentClassId === classId);
+    const results = await Promise.all(
+      list.map(async (s) => {
+        const res = await fetch("/api/admin/students/" + s.studentId + "/today");
+        const data: TodayData = res.ok ? await res.json() : { assignments: [], progress: 0 };
+        return { studentId: s.studentId, name: s.name, data };
+      })
+    );
+    setClassTodayList(results);
+  }
+
+  /** 지금 보고 있는 화면(학생 한 명 또는 반 전체)을 새로고침한다. */
+  async function refreshView() {
+    if (isClassAll) await loadClassToday(viewClassId);
+    else if (activeViewStudentId) await loadToday(activeViewStudentId);
+  }
+
   useEffect(() => {
+    if (isClassAll) {
+      setTodayData(null);
+      loadClassToday(viewClassId);
+      return;
+    }
+    setClassTodayList([]);
     if (activeViewStudentId) loadToday(activeViewStudentId);
     else setTodayData(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeViewStudentId]);
+  }, [activeViewStudentId, isClassAll, viewClassId, students]);
 
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault();
@@ -916,7 +947,7 @@ export default function ChecklistTestPage() {
       );
       if (!templateId) setClassActivityIds([]);
       await refreshBase();
-      if (activeViewStudentId) await loadToday(activeViewStudentId);
+      await refreshView();
       await loadClassRecurring(selectedClassId);
     } else {
       setAssignClassMsg("실패: " + data.error);
@@ -929,7 +960,7 @@ export default function ChecklistTestPage() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(patch),
     });
-    await loadToday(activeViewStudentId);
+    await refreshView();
   }
 
   async function resetItem(item: AssignedItem) {
@@ -966,17 +997,19 @@ export default function ChecklistTestPage() {
         method: "DELETE",
       }).catch(function () {});
     }
-    await loadToday(activeViewStudentId);
+    await refreshView();
   }
 
-  async function handleCreateShareLink() {
-    if (!activeViewStudentId) {
+  async function handleCreateShareLink(forStudentId?: string) {
+    const targetId = forStudentId || activeViewStudentId;
+    setClassShareFor(forStudentId || "");
+    if (!targetId) {
       setShareLinkMsg("학생을 먼저 선택해주세요.");
       return;
     }
     setShareLinkMsg("링크 생성 중...");
     setShareLinkUrl("");
-    const res = await fetch("/api/admin/students/" + activeViewStudentId + "/share-link", {
+    const res = await fetch("/api/admin/students/" + targetId + "/share-link", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({}),
@@ -995,6 +1028,191 @@ export default function ChecklistTestPage() {
 
   // 퇴원 처리된 학생은 배정/조회 대상에서 제외한다.
   const activeStudents = students.filter((s) => s.studentStatus !== "withdrawn");
+
+  function renderToday(data: TodayData) {
+    return (
+        <div>
+          <div
+            style={{
+              background: colors.blueLight,
+              borderRadius: 8,
+              overflow: "hidden",
+              height: 16,
+              marginBottom: 8,
+            }}
+          >
+            <div
+              style={{
+                width: data.progress + "%",
+                background: colors.blueGradient,
+                height: "100%",
+              }}
+            />
+          </div>
+          <p style={{ fontSize: 14, marginBottom: 16, color: colors.navy, fontWeight: 600 }}>진행률 {data.progress}%</p>
+
+          {data.assignments.length === 0 && (
+            <p style={{ color: colors.textSecondary }}>오늘 배정된 체크리스트가 없습니다.</p>
+          )}
+
+          {data.assignments.map((a) => (
+            <div key={a.assignmentId} style={{ marginBottom: 20 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                {a.standingSource === "class" && (
+                  <span style={{ fontSize: 12, fontWeight: 700, color: colors.blue, background: colors.blueLight, padding: "3px 10px", borderRadius: 8 }}>
+                    🏫 반 기본 체크리스트
+                  </span>
+                )}
+                {a.standingSource === "individual" && (
+                  <span style={{ fontSize: 12, fontWeight: 700, color: colors.pink, background: "#fdeef2", padding: "3px 10px", borderRadius: 8 }}>
+                    ➕ 개별 추가 체크리스트
+                  </span>
+                )}
+                {!a.standingSource && <span />}
+              </div>
+              {a.instruction && (
+                <div
+                  style={{
+                    background: colors.blueLight,
+                    borderRadius: 10,
+                    padding: 12,
+                    marginBottom: 10,
+                    fontSize: 13,
+                    color: colors.navy,
+                    whiteSpace: "pre-wrap",
+                    lineHeight: 1.5,
+                  }}
+                >
+                  📢 {a.instruction}
+                </div>
+              )}
+              {a.items.map((item) => (
+                <div
+                  key={item.assignedItemId}
+                  style={{
+                    ...card,
+                    padding: 16,
+                    marginBottom: 10,
+                    background: item.completed ? colors.greenLight : colors.card,
+                  }}
+                >
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+                    <div style={{ fontSize: 16, fontWeight: 700, color: colors.navy }}>
+                      {item.completed ? "✅ " : "⬜ "}
+                      {item.title}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => resetItem(item)}
+                      style={smallDangerBtn}
+                    >
+                      초기화
+                    </button>
+                  </div>
+
+                  {item.hasCheck && (
+                    <label style={{ display: "flex", alignItems: "center", marginBottom: 8, fontSize: 14, color: colors.navy }}>
+                      <input
+                        type="checkbox"
+                        checked={item.checked}
+                        onChange={(e) =>
+                          patchItem(item.assignedItemId, { checked: e.target.checked })
+                        }
+                        style={{ width: 20, height: 20, marginRight: 8 }}
+                      />
+                      체크 완료
+                    </label>
+                  )}
+
+                  {item.hasCount && (
+                    <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          patchItem(item.assignedItemId, {
+                            currentCount: item.currentCount - 1,
+                          })
+                        }
+                        disabled={item.currentCount <= 0}
+                        style={{ padding: "6px 14px", borderRadius: 8, border: `1px solid ${colors.border}`, background: colors.bg, cursor: "pointer" }}
+                      >
+                        -
+                      </button>
+                      <span style={{ color: colors.navy, fontWeight: 600 }}>
+                        {item.currentCount} / {item.targetCount}회
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          patchItem(item.assignedItemId, {
+                            currentCount: item.currentCount + 1,
+                          })
+                        }
+                        style={{ padding: "6px 14px", borderRadius: 8, border: "none", background: colors.blue, color: "#fff", cursor: "pointer" }}
+                      >
+                        +
+                      </button>
+                    </div>
+                  )}
+
+                  {item.hasScore && (
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+                      <input
+                        type="number"
+                        placeholder="점수"
+                        defaultValue={item.score ?? ""}
+                        onBlur={(e) =>
+                          patchItem(item.assignedItemId, {
+                            score: e.target.value === "" ? null : Number(e.target.value),
+                          })
+                        }
+                        style={{ width: 80, padding: 8, borderRadius: 8, border: `1px solid ${colors.border}` }}
+                      />
+                      <span style={{ color: colors.textSecondary }}>/ {item.maxScore}점</span>
+                    </div>
+                  )}
+
+                  {item.linkUrl && (
+                    <a href={item.linkUrl} target="_blank" rel="noreferrer" style={{ display: "inline-block", marginBottom: 8, color: colors.blue, fontSize: 13 }}>
+                      🔗 {item.linkLabel || "자료 열기"}
+                    </a>
+                  )}
+
+                  {item.teachingVideo && (
+                    <div style={{ marginBottom: 10 }}>
+                      <div style={{ fontSize: 13, color: colors.textSecondary, marginBottom: 4 }}>
+                        🎓 학습영상: {item.teachingVideo.title}
+                      </div>
+                      <video controls src={item.teachingVideo.url} style={{ width: "100%", maxHeight: 360, borderRadius: 10 }} />
+                    </div>
+                  )}
+
+                  {item.hasPhotoSubmission && <PhotoUploader assignedItemId={item.assignedItemId} onDone={function () { refreshView(); }} />}
+
+                  {item.hasAudioSubmission && <AudioUploader assignedItemId={item.assignedItemId} onDone={function () { refreshView(); }} />}
+
+                  {item.hasVideoSubmission && <VideoUploader assignedItemId={item.assignedItemId} onDone={function () { refreshView(); }} />}
+
+                  {item.hasFileSubmission && <FileUploader assignedItemId={item.assignedItemId} onDone={function () { refreshView(); }} />}
+
+                  {item.hasQrScan && (
+                    <div style={{ fontSize: 13, color: colors.textSecondary, marginBottom: 4 }}>
+                      📱 QR 스캔: {item.qrScannedUrl ? (
+                        <a href={item.qrScannedUrl} target="_blank" rel="noreferrer" style={{ color: colors.blue }}>
+                          스캔됨 (링크 열기)
+                        </a>
+                      ) : (
+                        "미스캔 (학생이 앱에서 직접 스캔)"
+                      )}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          ))}
+        </div>
+    );
+  }
 
   if (!loggedIn) {
     return (
@@ -1205,7 +1423,7 @@ export default function ChecklistTestPage() {
               value={viewClassId}
               onChange={(e) => {
                 setViewClassId(e.target.value);
-                setViewClassStudentId("");
+                setViewClassStudentId(e.target.value ? CLASS_ALL : "");
               }}
               style={box}
             >
@@ -1222,7 +1440,7 @@ export default function ChecklistTestPage() {
               style={box}
               disabled={!viewClassId}
             >
-              <option value="">학생 선택</option>
+              <option value={CLASS_ALL}>👥 반 전체 보기</option>
               {activeStudents
                 .filter((s) => s.currentClassId === viewClassId)
                 .map((s) => (
@@ -1234,15 +1452,17 @@ export default function ChecklistTestPage() {
           </div>
         )}
 
+        {!isClassAll && (
         <button
           type="button"
-          onClick={handleCreateShareLink}
+          onClick={() => handleCreateShareLink()}
           style={{ marginTop: 10, ...smallGhostBtn, padding: "9px 14px", fontSize: 13, fontWeight: 700 }}
         >
           학부모 공유링크 만들기 (오늘 날짜)
         </button>
-        {shareLinkMsg && <p style={{ fontSize: 13, marginTop: 6, color: colors.textSecondary }}>{shareLinkMsg}</p>}
-        {shareLinkUrl && (
+        )}
+        {!classShareFor && shareLinkMsg && <p style={{ fontSize: 13, marginTop: 6, color: colors.textSecondary }}>{shareLinkMsg}</p>}
+        {!classShareFor && shareLinkUrl && (
           <input
             readOnly
             value={shareLinkUrl}
@@ -1252,188 +1472,36 @@ export default function ChecklistTestPage() {
         )}
       </div>
 
-      {todayData && (
+      {isClassAll && (
         <div>
-          <div
-            style={{
-              background: colors.blueLight,
-              borderRadius: 8,
-              overflow: "hidden",
-              height: 16,
-              marginBottom: 8,
-            }}
-          >
-            <div
-              style={{
-                width: todayData.progress + "%",
-                background: colors.blueGradient,
-                height: "100%",
-              }}
-            />
-          </div>
-          <p style={{ fontSize: 14, marginBottom: 16, color: colors.navy, fontWeight: 600 }}>진행률 {todayData.progress}%</p>
-
-          {todayData.assignments.length === 0 && (
-            <p style={{ color: colors.textSecondary }}>오늘 배정된 체크리스트가 없습니다.</p>
+          {classTodayList.length === 0 && (
+            <p style={{ color: colors.textSecondary }}>이 반에 학생이 없습니다.</p>
           )}
-
-          {todayData.assignments.map((a) => (
-            <div key={a.assignmentId} style={{ marginBottom: 20 }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-                {a.standingSource === "class" && (
-                  <span style={{ fontSize: 12, fontWeight: 700, color: colors.blue, background: colors.blueLight, padding: "3px 10px", borderRadius: 8 }}>
-                    🏫 반 기본 체크리스트
-                  </span>
-                )}
-                {a.standingSource === "individual" && (
-                  <span style={{ fontSize: 12, fontWeight: 700, color: colors.pink, background: "#fdeef2", padding: "3px 10px", borderRadius: 8 }}>
-                    ➕ 개별 추가 체크리스트
-                  </span>
-                )}
-                {!a.standingSource && <span />}
+          {classTodayList.map((st) => (
+            <div key={st.studentId} style={{ ...card, padding: 16, marginBottom: 24, border: `2px solid ${colors.blueLight}` }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10, gap: 8 }}>
+                <div style={{ fontSize: 17, fontWeight: 800, color: colors.navy }}>👤 {st.name}</div>
+                <button
+                  type="button"
+                  onClick={() => handleCreateShareLink(st.studentId)}
+                  style={{ ...smallGhostBtn, fontSize: 12, fontWeight: 700 }}
+                >
+                  학부모 공유링크
+                </button>
               </div>
-              {a.instruction && (
-                <div
-                  style={{
-                    background: colors.blueLight,
-                    borderRadius: 10,
-                    padding: 12,
-                    marginBottom: 10,
-                    fontSize: 13,
-                    color: colors.navy,
-                    whiteSpace: "pre-wrap",
-                    lineHeight: 1.5,
-                  }}
-                >
-                  📢 {a.instruction}
-                </div>
+              {classShareFor === st.studentId && shareLinkMsg && (
+                <p style={{ fontSize: 13, marginBottom: 6, color: colors.textSecondary }}>{shareLinkMsg}</p>
               )}
-              {a.items.map((item) => (
-                <div
-                  key={item.assignedItemId}
-                  style={{
-                    ...card,
-                    padding: 16,
-                    marginBottom: 10,
-                    background: item.completed ? colors.greenLight : colors.card,
-                  }}
-                >
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
-                    <div style={{ fontSize: 16, fontWeight: 700, color: colors.navy }}>
-                      {item.completed ? "✅ " : "⬜ "}
-                      {item.title}
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => resetItem(item)}
-                      style={smallDangerBtn}
-                    >
-                      초기화
-                    </button>
-                  </div>
-
-                  {item.hasCheck && (
-                    <label style={{ display: "flex", alignItems: "center", marginBottom: 8, fontSize: 14, color: colors.navy }}>
-                      <input
-                        type="checkbox"
-                        checked={item.checked}
-                        onChange={(e) =>
-                          patchItem(item.assignedItemId, { checked: e.target.checked })
-                        }
-                        style={{ width: 20, height: 20, marginRight: 8 }}
-                      />
-                      체크 완료
-                    </label>
-                  )}
-
-                  {item.hasCount && (
-                    <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
-                      <button
-                        type="button"
-                        onClick={() =>
-                          patchItem(item.assignedItemId, {
-                            currentCount: item.currentCount - 1,
-                          })
-                        }
-                        disabled={item.currentCount <= 0}
-                        style={{ padding: "6px 14px", borderRadius: 8, border: `1px solid ${colors.border}`, background: colors.bg, cursor: "pointer" }}
-                      >
-                        -
-                      </button>
-                      <span style={{ color: colors.navy, fontWeight: 600 }}>
-                        {item.currentCount} / {item.targetCount}회
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() =>
-                          patchItem(item.assignedItemId, {
-                            currentCount: item.currentCount + 1,
-                          })
-                        }
-                        style={{ padding: "6px 14px", borderRadius: 8, border: "none", background: colors.blue, color: "#fff", cursor: "pointer" }}
-                      >
-                        +
-                      </button>
-                    </div>
-                  )}
-
-                  {item.hasScore && (
-                    <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
-                      <input
-                        type="number"
-                        placeholder="점수"
-                        defaultValue={item.score ?? ""}
-                        onBlur={(e) =>
-                          patchItem(item.assignedItemId, {
-                            score: e.target.value === "" ? null : Number(e.target.value),
-                          })
-                        }
-                        style={{ width: 80, padding: 8, borderRadius: 8, border: `1px solid ${colors.border}` }}
-                      />
-                      <span style={{ color: colors.textSecondary }}>/ {item.maxScore}점</span>
-                    </div>
-                  )}
-
-                  {item.linkUrl && (
-                    <a href={item.linkUrl} target="_blank" rel="noreferrer" style={{ display: "inline-block", marginBottom: 8, color: colors.blue, fontSize: 13 }}>
-                      🔗 {item.linkLabel || "자료 열기"}
-                    </a>
-                  )}
-
-                  {item.teachingVideo && (
-                    <div style={{ marginBottom: 10 }}>
-                      <div style={{ fontSize: 13, color: colors.textSecondary, marginBottom: 4 }}>
-                        🎓 학습영상: {item.teachingVideo.title}
-                      </div>
-                      <video controls src={item.teachingVideo.url} style={{ width: "100%", maxHeight: 360, borderRadius: 10 }} />
-                    </div>
-                  )}
-
-                  {item.hasPhotoSubmission && <PhotoUploader assignedItemId={item.assignedItemId} onDone={function () { loadToday(activeViewStudentId); }} />}
-
-                  {item.hasAudioSubmission && <AudioUploader assignedItemId={item.assignedItemId} onDone={function () { loadToday(activeViewStudentId); }} />}
-
-                  {item.hasVideoSubmission && <VideoUploader assignedItemId={item.assignedItemId} onDone={function () { loadToday(activeViewStudentId); }} />}
-
-                  {item.hasFileSubmission && <FileUploader assignedItemId={item.assignedItemId} onDone={function () { loadToday(activeViewStudentId); }} />}
-
-                  {item.hasQrScan && (
-                    <div style={{ fontSize: 13, color: colors.textSecondary, marginBottom: 4 }}>
-                      📱 QR 스캔: {item.qrScannedUrl ? (
-                        <a href={item.qrScannedUrl} target="_blank" rel="noreferrer" style={{ color: colors.blue }}>
-                          스캔됨 (링크 열기)
-                        </a>
-                      ) : (
-                        "미스캔 (학생이 앱에서 직접 스캔)"
-                      )}
-                    </div>
-                  )}
-                </div>
-              ))}
+              {classShareFor === st.studentId && shareLinkUrl && (
+                <input readOnly value={shareLinkUrl} onFocus={(e) => e.target.select()} style={{ ...box, marginBottom: 10, fontSize: 13 }} />
+              )}
+              {renderToday(st.data)}
             </div>
           ))}
         </div>
       )}
+
+      {!isClassAll && todayData && renderToday(todayData)}
     </div>
   );
 }
