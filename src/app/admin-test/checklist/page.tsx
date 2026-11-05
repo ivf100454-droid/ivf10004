@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { colors, fontFamily } from "../theme";
+import ItemOrderEditor from "./ItemOrderEditor";
 
 type Student = {
   studentId: string;
@@ -1389,7 +1390,21 @@ export default function ChecklistTestPage() {
       </div>
 
       <div style={{ ...card, padding: 18, marginBottom: 20 }}>
-        <h2 style={{ fontSize: 15, fontWeight: 800, marginBottom: 10, color: colors.navy }}>3. 오늘 체크리스트 보기</h2>
+        <h2 style={{ fontSize: 15, fontWeight: 800, marginBottom: 10, color: colors.navy }}>3. 체크리스트 활동순서 수정</h2>
+        <ItemOrderEditor
+          students={activeStudents.map((s) => ({ id: s.studentId, name: s.name }))}
+          classes={classes.map((c) => ({ id: c.classId, name: c.name + " (" + c.studentCount + "명)" }))}
+          primaryBtn={primaryBtn}
+          ghostBtn={smallGhostBtn}
+          onSaved={() => {
+            refreshBase();
+            refreshView();
+          }}
+        />
+      </div>
+
+      <div style={{ ...card, padding: 18, marginBottom: 20 }}>
+        <h2 style={{ fontSize: 15, fontWeight: 800, marginBottom: 10, color: colors.navy }}>4. 오늘 체크리스트 보기</h2>
 
         <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
           <button
