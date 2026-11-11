@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getAdminFromRequest } from "@/lib/adminAuth";
 import { ensureTodayAssignmentsForClass } from "@/lib/checklistGeneration";
-import { startOrReplaceRecurring, getActiveRecurring, endRecurring } from "@/lib/recurringAssignments";
+import { startOrReplaceRecurring, getActiveRecurring, endRecurring, endAllActiveRecurring } from "@/lib/recurringAssignments";
 
 export async function PUT(req: NextRequest, { params }: { params: { id: string } }) {
   const admin = await getAdminFromRequest(req);
@@ -48,8 +48,7 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
       // (진행 중인 학생은 건드리지 않음).
       await ensureTodayAssignmentsForClass(updated.classId);
     } else {
-      const existingRa = await getActiveRecurring("class", updated.classId);
-      if (existingRa) await endRecurring(existingRa.recurringAssignmentId);
+      await endAllActiveRecurring("class", updated.classId);
     }
   }
 

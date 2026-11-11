@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { colors, fontFamily } from "../theme";
 import ItemOrderEditor from "./ItemOrderEditor";
 
@@ -662,6 +662,11 @@ export default function ChecklistTestPage() {
 
   const [selectedStudentId, setSelectedStudentId] = useState("");
   const [assignStudentMsg, setAssignStudentMsg] = useState("");
+  // 배정 버튼 연타로 같은 요청이 여러 번 동시에 가지 않도록 잠근다.
+  const assigningStudentRef = useRef(false);
+  const [assigningStudent, setAssigningStudent] = useState(false);
+  const assigningClassRef = useRef(false);
+  const [assigningClass, setAssigningClass] = useState(false);
   const [studentRecurring, setStudentRecurring] = useState<RecurringRow[]>([]);
 
   const [selectedClassId, setSelectedClassId] = useState("");
@@ -851,6 +856,18 @@ export default function ChecklistTestPage() {
   }
 
   async function assignStudent(clear: boolean) {
+    if (assigningStudentRef.current) return;
+    assigningStudentRef.current = true;
+    setAssigningStudent(true);
+    try {
+      await assignStudentInner(clear);
+    } finally {
+      assigningStudentRef.current = false;
+      setAssigningStudent(false);
+    }
+  }
+
+  async function assignStudentInner(clear: boolean) {
     setAssignStudentMsg("");
     if (!selectedStudentId) {
       setAssignStudentMsg("학생을 선택해주세요.");
@@ -905,6 +922,18 @@ export default function ChecklistTestPage() {
   }
 
   async function assignClass(clear: boolean) {
+    if (assigningClassRef.current) return;
+    assigningClassRef.current = true;
+    setAssigningClass(true);
+    try {
+      await assignClassInner(clear);
+    } finally {
+      assigningClassRef.current = false;
+      setAssigningClass(false);
+    }
+  }
+
+  async function assignClassInner(clear: boolean) {
     setAssignClassMsg("");
     if (!selectedClassId) {
       setAssignClassMsg("클래스를 선택해주세요.");
@@ -919,7 +948,7 @@ export default function ChecklistTestPage() {
           setAssignClassMsg("'활동 배정'을 눌러 활동을 하나 이상 골라주세요.");
           return;
         }
-        return assignClass(true);
+        return assignClassInner(true);
       }
       if (c?.templateId && sameList(activityIdsOf(c.templateId), classActivityIds)) {
         setAssignClassMsg("이미 이 활동들로 배정되어 있어요. (변경 없음)");
@@ -1291,10 +1320,10 @@ export default function ChecklistTestPage() {
             ))}
           </select>
           <ActivityPicker activities={activities} areas={areas} picked={studentActivityIds} onChange={setStudentActivityIds} />
-          <button type="submit" style={primaryBtn}>
-            이 학생에게 개별 배정
+          <button type="submit" style={{ ...primaryBtn, opacity: assigningStudent ? 0.6 : 1 }} disabled={assigningStudent}>
+            {assigningStudent ? "배정 중..." : "이 학생에게 개별 배정"}
           </button>
-          <button type="button" style={{ ...smallDangerBtn, alignSelf: "flex-end" }} onClick={() => assignStudent(true)}>
+          <button type="button" style={{ ...smallDangerBtn, alignSelf: "flex-end" }} disabled={assigningStudent} onClick={() => assignStudent(true)}>
             개별 배정 해제
           </button>
         </form>
@@ -1353,10 +1382,10 @@ export default function ChecklistTestPage() {
             ))}
           </select>
           <ActivityPicker activities={activities} areas={areas} picked={classActivityIds} onChange={setClassActivityIds} />
-          <button type="submit" style={primaryBtn}>
-            이 클래스 전체에 배정
+          <button type="submit" style={{ ...primaryBtn, opacity: assigningClass ? 0.6 : 1 }} disabled={assigningClass}>
+            {assigningClass ? "배정 중..." : "이 클래스 전체에 배정"}
           </button>
-          <button type="button" style={{ ...smallDangerBtn, alignSelf: "flex-end" }} onClick={() => assignClass(true)}>
+          <button type="button" style={{ ...smallDangerBtn, alignSelf: "flex-end" }} disabled={assigningClass} onClick={() => assignClass(true)}>
             클래스 배정 해제
           </button>
         </form>

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getAdminFromRequest } from "@/lib/adminAuth";
-import { getActiveRecurring, startOrReplaceRecurring, endRecurring } from "@/lib/recurringAssignments";
+import { getActiveRecurring, startOrReplaceRecurring, endRecurring, endAllActiveRecurring } from "@/lib/recurringAssignments";
 import { ensureTodayAssignmentsForClass } from "@/lib/checklistGeneration";
 import { getAcademyToday } from "@/lib/timezone";
 
@@ -44,8 +44,7 @@ export async function POST(req: NextRequest) {
   const clearing = body.templateId === "";
 
   if (clearing) {
-    const existing = await getActiveRecurring("class", cls.classId);
-    if (existing) await endRecurring(existing.recurringAssignmentId);
+    await endAllActiveRecurring("class", cls.classId);
     // 해제하면 내일부터는 물론, 오늘 이미 만들어진 반 체크리스트도 함께 삭제한다.
     const deletedTodayCount = await deleteTodayClassAssignments(cls.classId);
     return NextResponse.json({

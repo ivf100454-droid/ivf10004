@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { getAdminFromRequest } from "@/lib/adminAuth";
 import { getAcademyToday } from "@/lib/timezone";
-import { getActiveRecurring, startOrReplaceRecurring, endRecurring } from "@/lib/recurringAssignments";
+import { startOrReplaceRecurring, endAllActiveRecurring } from "@/lib/recurringAssignments";
 import { ensureTodayAssignment } from "@/lib/checklistGeneration";
 
 /**
@@ -33,8 +33,7 @@ export async function POST(req: NextRequest) {
   const todayDate = new Date(`${todayStr}T00:00:00.000Z`);
 
   if (clearingOverride) {
-    const existing = await getActiveRecurring("student", student.studentId);
-    if (existing) await endRecurring(existing.recurringAssignmentId);
+    await endAllActiveRecurring("student", student.studentId);
 
     // 오늘의 "개별" 배정만 지운다 (반 기본 배정은 그대로 유지).
     await prisma.checklistAssignment.deleteMany({
@@ -62,6 +61,16 @@ export async function POST(req: NextRequest) {
     // 템플릿이 바뀐 경우, 오늘의 "개별" 배정만 지우고 새 템플릿으로 즉시 재생성한다.
     await prisma.checklistAssignment.deleteMany({
       where: { studentId: student.studentId, checklistDate: todayDate, standingSource: "individual" },
+    });
+  } else {
+    // 같은 템플릿이어도, 지금 활성 배정이 아닌 다른(예전 중복) 개별 배정이 오늘 남아 있으면 정리한다.
+    await prisma.checklistAssignment.deleteMany({
+      where: {
+        studentId: student.studentId,
+        checklistDate: todayDate,
+        standingSource: "individual",
+        NOT: { recurringAssignmentId: recurringAssignment.recurringAssignmentId },
+      },
     });
   }
 

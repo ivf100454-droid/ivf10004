@@ -146,9 +146,19 @@ async function getApplicableRecurringAssignments(studentId: string) {
       OR: [{ endDate: null }, { endDate: { gte: todayDate } }],
       AND: [{ OR: targetFilters }],
     },
+    orderBy: { createdAt: "desc" },
   });
 
-  const applicableToday = recurring.filter((ra) => ra.activeDays.includes(weekday));
+  // 개별(학생) 활성 배정은 1개만 유효하다 — 혹시 중복으로 여러 개 남아 있어도 가장 최근 것만 쓴다.
+  let seenStudentRecurring = false;
+  const deduped = recurring.filter((ra) => {
+    if (ra.targetType !== "student") return true;
+    if (seenStudentRecurring) return false;
+    seenStudentRecurring = true;
+    return true;
+  });
+
+  const applicableToday = deduped.filter((ra) => ra.activeDays.includes(weekday));
 
   return { student, recurring: applicableToday };
 }
